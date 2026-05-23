@@ -1,7 +1,9 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen } from 'electron';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
+import { createTray, toggleWindow, updateTrayTheme } from './tray.ts';
 
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
@@ -58,23 +60,56 @@ function showWindowNearCursor(): void {
   mainWindow.setPosition(x, y);
 }
 
+function registerGnomeShortcut(): void {
+  const BINDING_PATH =
+    '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/clipboard-manager/';
+  const KEY = `org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BINDING_PATH}`;
+
+  spawnSync('gsettings', [
+    'set',
+    'org.gnome.settings-daemon.plugins.media-keys',
+    'custom-keybindings',
+    `['${BINDING_PATH}']`,
+  ]);
+  spawnSync('gsettings', ['set', KEY, 'name', 'Clipboard Manager']);
+  spawnSync('gsettings', ['set', KEY, 'binding', '<Super><Shift>v']);
+}
+
 app.whenReady().then(() => {
+  spawnSync('gsettings', ['set', 'org.gnome.desktop.interface', 'toolkit-accessibility', 'true']);
+  registerGnomeShortcut();
+
   initDatabase();
   createWindow();
 
   if (mainWindow) {
+    createTray(mainWindow, nativeTheme.shouldUseDarkColors);
+
     nativeTheme.on('updated', () => {
+      updateTrayTheme(nativeTheme.shouldUseDarkColors);
       mainWindow?.webContents.send('native-theme-changed', nativeTheme.shouldUseDarkColors);
     });
 
     startClipboardWatcher((content) => {
       mainWindow?.webContents.send('clipboard-changed', content);
     });
+
+    globalShortcut.register('Super+Shift+V', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        showWindowNearCursor();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
   }
 });
 
 app.on('will-quit', () => {
   stopClipboardWatcher();
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {
@@ -107,14 +142,7 @@ ipcMain.handle('hide-window', () => {
   mainWindow?.hide();
 });
 ipcMain.handle('toggle-window', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isVisible()) {
-    mainWindow.hide();
-  } else {
-    showWindowNearCursor();
-    mainWindow.show();
-    mainWindow.focus();
-  }
+  if (mainWindow) toggleWindow(mainWindow);
 });
 ipcMain.handle('copy-and-paste', (_, content: string) => {
   copyToClipboard(content);
