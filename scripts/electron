@@ -1,0 +1,15 @@
+#!/bin/bash
+# Unset ELECTRON_RUN_AS_NODE so the Electron browser process initializes correctly.
+# Claude Code (and some other tools) set ELECTRON_RUN_AS_NODE=1 in the shell
+# environment, which forces Electron to behave as plain Node.js (no electron API).
+#
+# --no-sandbox + --disable-gpu: required in many Linux environments (VMs,
+# containers, Wayland without a setuid chrome-sandbox) to prevent the zygote
+# and GPU subprocess from crashing before the app starts.
+unset ELECTRON_RUN_AS_NODE
+exec "$(dirname "$0")/../node_modules/electron/dist/electron" \
+  --no-sandbox \
+  --disable-gpu \
+  --disable-gpu-sandbox \
+  --disable-software-rasterizer \
+  "$@"
