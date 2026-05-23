@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Generates tray icons at startup (run via postinstall).
-//   resources/icon-light.png  — indigo bg + white lines  (light desktop)
-//   resources/icon-dark.png   — white  bg + indigo lines (dark  desktop)
-//   resources/icon.png        — alias to icon-light.png  (default fallback)
+// Generates tray icons and the high-res build icon.
+//   resources/icon-light.png  (64×64)   — indigo bg + white lines  (light desktop)
+//   resources/icon-dark.png   (64×64)   — white  bg + indigo lines (dark  desktop)
+//   resources/icon.png        (64×64)   — default fallback (= icon-light.png)
+//   resources/icon-512.png    (512×512) — used by electron-builder for AppImage/deb
 
 const fs   = require('fs')
 const zlib = require('zlib')
@@ -46,35 +47,37 @@ function makePng(pixels, w, h) {
   ])
 }
 
-// ── Icon geometry (64×64, mirrors SVG viewBox 28×28 scaled ×2.286) ────────────
-const W = 64, H = 64, R = 14
-const LINES = [
-  { y: 21, x1: 18, x2: 46 },
-  { y: 30, x1: 18, x2: 46 },
-  { y: 39, x1: 18, x2: 37 },
-]
-const HALF = 2
+// ── Renderer — SVG viewBox is 28×28, rect rx=7, stroke-width 2 ───────────────
+function renderIcon(size, bgR, bgG, bgB, lineR, lineG, lineB) {
+  const s    = size / 28
+  const W    = size, H = size
+  const R    = Math.round(7 * s)
+  const HALF = Math.max(1, Math.round(s))
+  const LINES = [
+    { y: Math.round(9  * s), x1: Math.round(8 * s), x2: Math.round(20 * s) },
+    { y: Math.round(13 * s), x1: Math.round(8 * s), x2: Math.round(20 * s) },
+    { y: Math.round(17 * s), x1: Math.round(8 * s), x2: Math.round(16 * s) },
+  ]
 
-function inRoundedRect(x, y) {
-  if (x < 0 || x >= W || y < 0 || y >= H) return false
-  if (x < R    && y < R    && (x-R)**2     + (y-R)**2     > R*R) return false
-  if (x >= W-R && y < R    && (x-(W-R-1))**2 + (y-R)**2   > R*R) return false
-  if (x < R    && y >= H-R && (x-R)**2     + (y-(H-R-1))**2 > R*R) return false
-  if (x >= W-R && y >= H-R && (x-(W-R-1))**2 + (y-(H-R-1))**2 > R*R) return false
-  return true
-}
-
-function onLine(x, y) {
-  for (const ln of LINES) {
-    if (y < ln.y - HALF || y > ln.y + HALF) continue
-    if (x >= ln.x1 && x <= ln.x2) return true
-    if (x < ln.x1  && (x-ln.x1)**2 + (y-ln.y)**2 <= (HALF+0.5)**2) return true
-    if (x > ln.x2  && (x-ln.x2)**2 + (y-ln.y)**2 <= (HALF+0.5)**2) return true
+  function inRoundedRect(x, y) {
+    if (x < 0 || x >= W || y < 0 || y >= H) return false
+    if (x < R    && y < R    && (x-R)**2       + (y-R)**2       > R*R) return false
+    if (x >= W-R && y < R    && (x-(W-R-1))**2 + (y-R)**2       > R*R) return false
+    if (x < R    && y >= H-R && (x-R)**2       + (y-(H-R-1))**2 > R*R) return false
+    if (x >= W-R && y >= H-R && (x-(W-R-1))**2 + (y-(H-R-1))**2 > R*R) return false
+    return true
   }
-  return false
-}
 
-function renderIcon(bgR, bgG, bgB, lineR, lineG, lineB) {
+  function onLine(x, y) {
+    for (const ln of LINES) {
+      if (y < ln.y - HALF || y > ln.y + HALF) continue
+      if (x >= ln.x1 && x <= ln.x2) return true
+      if (x < ln.x1  && (x-ln.x1)**2 + (y-ln.y)**2 <= (HALF+0.5)**2) return true
+      if (x > ln.x2  && (x-ln.x2)**2 + (y-ln.y)**2 <= (HALF+0.5)**2) return true
+    }
+    return false
+  }
+
   const pixels = new Uint8Array(W * H * 4)
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -95,13 +98,18 @@ function renderIcon(bgR, bgG, bgB, lineR, lineG, lineB) {
 const dir = path.join(__dirname, 'resources')
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 
-const lightIcon = renderIcon(99, 102, 241, 255, 255, 255)
-const darkIcon  = renderIcon(255, 255, 255, 99, 102, 241)
+// Tray icons (64×64)
+const light64 = renderIcon(64,  99, 102, 241, 255, 255, 255)
+const dark64  = renderIcon(64,  255, 255, 255, 99, 102, 241)
+fs.writeFileSync(path.join(dir, 'icon-light.png'), light64)
+fs.writeFileSync(path.join(dir, 'icon-dark.png'),  dark64)
+fs.writeFileSync(path.join(dir, 'icon.png'),        light64)
 
-fs.writeFileSync(path.join(dir, 'icon-light.png'), lightIcon)
-fs.writeFileSync(path.join(dir, 'icon-dark.png'),  darkIcon)
-fs.writeFileSync(path.join(dir, 'icon.png'),        lightIcon)
+// Build icon (512×512) — required by electron-builder for AppImage / .deb
+const build512 = renderIcon(512, 99, 102, 241, 255, 255, 255)
+fs.writeFileSync(path.join(dir, 'icon-512.png'), build512)
 
-console.log('resources/icon-light.png  — indigo bg + white lines  (light desktop)')
-console.log('resources/icon-dark.png   — white  bg + indigo lines (dark  desktop)')
-console.log('resources/icon.png        — default fallback (= icon-light.png)')
+console.log('resources/icon-light.png  (64×64)   — tray light desktop')
+console.log('resources/icon-dark.png   (64×64)   — tray dark desktop')
+console.log('resources/icon.png        (64×64)   — default fallback')
+console.log('resources/icon-512.png    (512×512) — build icon for AppImage/deb')
