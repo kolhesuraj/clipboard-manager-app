@@ -19,4 +19,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onNativeThemeChanged: (cb: (isDark: boolean) => void) =>
     ipcRenderer.on('native-theme-changed', (_, isDark) => cb(isDark)),
+
+  onPasteToolMissing: (cb: () => void) =>
+    ipcRenderer.on('paste-tool-missing', () => cb()),
+
+  checkPasteTool: () => ipcRenderer.invoke('check-paste-tool'),
+  setMutterConsent: (value: boolean) => ipcRenderer.invoke('set-mutter-consent', value)
 })

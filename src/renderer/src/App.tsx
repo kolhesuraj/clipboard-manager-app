@@ -26,6 +26,9 @@ declare global {
       onClipboardChanged: (cb: (content: string) => void) => void
       onClearHistoryRequest: (cb: () => void) => void
       onNativeThemeChanged: (cb: (isDark: boolean) => void) => void
+      onPasteToolMissing: (cb: () => void) => void
+      checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean }>
+      setMutterConsent: (value: boolean) => Promise<void>
     }
   }
 }
@@ -42,6 +45,8 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [themePref, setThemePref] = useState<ThemePref>('system')
   const [systemIsDark, setSystemIsDark] = useState(true)
+  const [toast, setToast] = useState(false)
+  const [warning, setWarning] = useState(false)
 
   const load = useCallback(
     async (q = search) => setItems(await window.electronAPI.getItems(q)),
@@ -66,6 +71,13 @@ export default function App() {
   useEffect(() => {
     load('')
     window.electronAPI.onClipboardChanged(() => load())
+    window.electronAPI.checkPasteTool().then(({ silent, mutterAllowed }) => {
+      if (!silent && !mutterAllowed) setWarning(true)
+    })
+    window.electronAPI.onPasteToolMissing(() => {
+      setToast(true)
+      setTimeout(() => setToast(false), 5000)
+    })
     window.electronAPI.onClearHistoryRequest(async () => {
       await window.electronAPI.clearHistory()
       load('')
@@ -111,6 +123,11 @@ export default function App() {
     load('')
   }
 
+  const handleAllowMutter = async () => {
+    await window.electronAPI.setMutterConsent(true)
+    setWarning(false)
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -131,6 +148,26 @@ export default function App() {
         </div>
       </header>
 
+      {warning && (
+        <div className="warning-banner">
+          <div className="warning-banner-row">
+            <span>⚠️ Auto-paste unavailable — wtype/xdotool not found</span>
+            <button className="warning-dismiss" onClick={() => setWarning(false)}>✕</button>
+          </div>
+          <div className="warning-banner-options">
+            <button className="warning-allow" onClick={handleAllowMutter}>
+              Allow via screen recording
+            </button>
+            <span className="warning-or">or install silently:</span>
+          </div>
+          <div className="warning-banner-cmd">
+            <code>sudo apt install wtype</code>
+            <button className="toast-copy" onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}>Copy</button>
+          </div>
+          <div className="warning-note">Screen recording method briefly shows the indicator</div>
+        </div>
+      )}
+
       <SearchBar value={search} onChange={handleSearch} />
 
       <ClipboardList
@@ -144,6 +181,22 @@ export default function App() {
         {items.length} item{items.length !== 1 ? 's' : ''}&nbsp;·&nbsp;
         Super+Shift+V to toggle&nbsp;·&nbsp;Esc to close
       </footer>
+
+      {toast && (
+        <div className="toast-error">
+          <span>⚠️ Copied — paste manually with Ctrl+V</span>
+          <div className="toast-hint">
+            <code>sudo apt install wtype</code>
+            <button
+              className="toast-copy"
+              onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}
+              title="Copy command"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

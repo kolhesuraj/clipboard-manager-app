@@ -1,5 +1,6 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen } from 'electron';
 import { spawnSync } from 'child_process';
+import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
@@ -18,6 +19,19 @@ app.disableHardwareAcceleration();
 
 let mainWindow: BrowserWindow | null = null;
 let lastFocusedIsTerminal = false;
+
+type AppSettings = { mutterConsent: boolean }
+let settings: AppSettings = { mutterConsent: false }
+
+function settingsPath(): string {
+  return path.join(app.getPath('userData'), 'settings.json')
+}
+function loadSettings(): void {
+  try { settings = JSON.parse(readFileSync(settingsPath(), 'utf8')) } catch { /* use defaults */ }
+}
+function saveSettings(): void {
+  try { writeFileSync(settingsPath(), JSON.stringify(settings)) } catch { /* ignore */ }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -87,6 +101,7 @@ function registerGnomeShortcut(): void {
 }
 
 app.whenReady().then(() => {
+  loadSettings();
   spawnSync('gsettings', ['set', 'org.gnome.desktop.interface', 'toolkit-accessibility', 'true']);
   registerGnomeShortcut();
 
@@ -166,12 +181,23 @@ ipcMain.handle('hide-window', () => {
 ipcMain.handle('toggle-window', () => {
   if (mainWindow) toggleWindow(mainWindow);
 });
+ipcMain.handle('check-paste-tool', () => ({
+  silent: hasSilentPasteTool(),
+  mutterAllowed: settings.mutterConsent,
+}));
+ipcMain.handle('set-mutter-consent', (_, value: boolean) => {
+  settings.mutterConsent = value;
+  saveSettings();
+});
 
+// Copy content, hide the window, then simulate Ctrl+V in the previously focused app.
+// Falls back to Mutter RemoteDesktop if the user has consented (shows screen-recording indicator).
+// If neither path is available, keeps the window open and emits paste-tool-missing.
 ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
     copyToClipboard(content);
 
-    if (!hasSilentPasteTool()) {
+    if (!hasSilentPasteTool() && !settings.mutterConsent) {
       mainWindow?.webContents.send('paste-tool-missing');
       return true;
     }
