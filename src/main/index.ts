@@ -1,0 +1,123 @@
+import { app, BrowserWindow, ipcMain, nativeTheme, screen } from 'electron';
+import path from 'path';
+import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
+import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
+
+process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
+process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.disableHardwareAcceleration();
+
+let mainWindow: BrowserWindow | null = null;
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 500,
+    height: 640,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    const port = process.env.ELECTRON_RENDERER_URL?.split(':').pop() || '5173';
+    mainWindow.loadURL(`http://localhost:${port}`);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
+
+  mainWindow.on('blur', () => {
+    if (mainWindow && !mainWindow.webContents.isDevToolsFocused()) {
+      mainWindow.hide();
+    }
+  });
+}
+
+function showWindowNearCursor(): void {
+  if (!mainWindow) return;
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  const { workArea } = display;
+  const [w, h] = mainWindow.getSize();
+  let x = cursor.x;
+  let y = cursor.y;
+  if (x + w > workArea.x + workArea.width) x = workArea.x + workArea.width - w;
+  if (y + h > workArea.y + workArea.height) y = workArea.y + workArea.height - h;
+  if (x < workArea.x) x = workArea.x;
+  if (y < workArea.y) y = workArea.y;
+  mainWindow.setPosition(x, y);
+}
+
+app.whenReady().then(() => {
+  initDatabase();
+  createWindow();
+
+  if (mainWindow) {
+    nativeTheme.on('updated', () => {
+      mainWindow?.webContents.send('native-theme-changed', nativeTheme.shouldUseDarkColors);
+    });
+
+    startClipboardWatcher((content) => {
+      mainWindow?.webContents.send('clipboard-changed', content);
+    });
+  }
+});
+
+app.on('will-quit', () => {
+  stopClipboardWatcher();
+});
+
+app.on('window-all-closed', () => {
+  // intentionally empty — keep the app alive in the system tray
+});
+
+// IPC handlers
+ipcMain.handle('get-native-theme', () => nativeTheme.shouldUseDarkColors);
+ipcMain.handle('set-native-theme', (_, source: 'system' | 'dark' | 'light') => {
+  nativeTheme.themeSource = source;
+});
+ipcMain.handle('get-items', (_, search: string) => getItems(search));
+ipcMain.handle('copy-item', (_, content: string) => {
+  copyToClipboard(content);
+  return true;
+});
+ipcMain.handle('delete-item', (_, id: number) => {
+  deleteItem(id);
+  return true;
+});
+ipcMain.handle('clear-history', () => {
+  clearHistory();
+  return true;
+});
+ipcMain.handle('toggle-pin', (_, id: number) => {
+  togglePin(id);
+  return true;
+});
+ipcMain.handle('hide-window', () => {
+  mainWindow?.hide();
+});
+ipcMain.handle('toggle-window', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isVisible()) {
+    mainWindow.hide();
+  } else {
+    showWindowNearCursor();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+ipcMain.handle('copy-and-paste', (_, content: string) => {
+  copyToClipboard(content);
+  mainWindow?.hide();
+  return true;
+});
