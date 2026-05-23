@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+dist-electron/
+
+# Electron packaged builds
+release/
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# SQLite database (user data)
+*.db
+*.db-shm
+*.db-wal
+
+# Unix socket (runtime artifact)
+*.sock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
