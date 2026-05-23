@@ -5,7 +5,9 @@ import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './d
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
 import { createTray, toggleWindow, updateTrayTheme } from './tray.ts';
 import { simulatePaste } from './paste.ts';
+import { isTerminalFocused, hasFocusedWindow } from './utils/focus.ts';
 import { hasSilentPasteTool } from './utils/shell.ts';
+import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-server.ts';
 
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
@@ -75,6 +77,12 @@ function registerGnomeShortcut(): void {
     `['${BINDING_PATH}']`,
   ]);
   spawnSync('gsettings', ['set', KEY, 'name', 'Clipboard Manager']);
+  spawnSync('gsettings', [
+    'set',
+    KEY,
+    'command',
+    `curl -s --unix-socket ${getSocketPath()} http://localhost/toggle`,
+  ]);
   spawnSync('gsettings', ['set', KEY, 'binding', '<Super><Shift>v']);
 }
 
@@ -102,16 +110,27 @@ app.whenReady().then(() => {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
+        if (!hasFocusedWindow()) return;
+        lastFocusedIsTerminal = isTerminalFocused();
         showWindowNearCursor();
         mainWindow.show();
         mainWindow.focus();
       }
     });
+
+    startTriggerServer(
+      () => mainWindow,
+      () => {
+        if (!hasFocusedWindow()) return;
+        lastFocusedIsTerminal = isTerminalFocused();
+      }
+    );
   }
 });
 
 app.on('will-quit', () => {
   stopClipboardWatcher();
+  stopTriggerServer();
   globalShortcut.unregisterAll();
 });
 
