@@ -4,6 +4,8 @@ import path from 'path';
 import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
 import { createTray, toggleWindow, updateTrayTheme } from './tray.ts';
+import { simulatePaste } from './paste.ts';
+import { hasSilentPasteTool } from './utils/shell.ts';
 
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
@@ -13,6 +15,7 @@ app.commandLine.appendSwitch('disable-software-rasterizer');
 app.disableHardwareAcceleration();
 
 let mainWindow: BrowserWindow | null = null;
+let lastFocusedIsTerminal = false;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -144,8 +147,21 @@ ipcMain.handle('hide-window', () => {
 ipcMain.handle('toggle-window', () => {
   if (mainWindow) toggleWindow(mainWindow);
 });
-ipcMain.handle('copy-and-paste', (_, content: string) => {
-  copyToClipboard(content);
-  mainWindow?.hide();
+
+ipcMain.handle('copy-and-paste', async (_, content: string) => {
+  try {
+    copyToClipboard(content);
+
+    if (!hasSilentPasteTool()) {
+      mainWindow?.webContents.send('paste-tool-missing');
+      return true;
+    }
+
+    mainWindow?.hide();
+    await new Promise<void>((r) => setTimeout(r, 500));
+    await simulatePaste(lastFocusedIsTerminal);
+  } catch (err) {
+    console.error('[copy-and-paste] CRASH:', err);
+  }
   return true;
 });
