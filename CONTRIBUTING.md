@@ -40,17 +40,21 @@ app/src/
 ## Architecture Notes
 
 ### Paste simulation
+
 Paste is attempted in order: **xdotool** → **Mutter RemoteDesktop D-Bus** → **wtype**.  
 Mutter D-Bus is the most reliable on GNOME Wayland and works even for native Wayland apps.  
 All three paths are async — never use `spawnSync` here (it blocks Electron's event loop).
 
 ### Terminal detection
+
 `isTerminalFocused()` in `paste.ts` reads `_NET_ACTIVE_WINDOW` via `xprop` **before** the clipboard manager window opens (while the target app still has focus). If the active window ID is `0x0` (native Wayland app), it falls back to `pgrep gnome-terminal-`. This must be called at toggle time, not at paste time.
 
 ### Clipboard write
+
 `wl-copy` stays alive as a clipboard server and never exits — always use async `spawn` with `detached: true` and `proc.unref()`. Never `spawnSync('wl-copy', ...)`.
 
 ### Unix socket
+
 The trigger server listens on a Unix socket at `app.getPath('userData')/trigger.sock`. The GNOME shortcut fires `curl --unix-socket <path> http://localhost/toggle`. No TCP port is used.
 
 ---
@@ -78,6 +82,7 @@ The trigger server listens on a Unix socket at `app.getPath('userData')/trigger.
 ## Reporting Bugs
 
 Please open a GitHub issue with:
+
 - Your Linux distro and GNOME version (`gnome-shell --version`)
 - Whether you are on Wayland or X11 (`echo $XDG_SESSION_TYPE`)
 - Steps to reproduce
