@@ -35,7 +35,7 @@ Press **Super+Shift+V** to instantly browse and paste anything you've copied —
 ```bash
 # Clone the repo
 git clone https://github.com/kolhesuraj/clipboard-manager-app.git
-cd clipboard-manager/app
+cd clipboard-manager-app
 
 # Install dependencies (also rebuilds native modules for Electron)
 npm install
