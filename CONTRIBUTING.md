@@ -7,8 +7,8 @@ Thank you for your interest in contributing! This document covers everything you
 ## Development Setup
 
 ```bash
-git clone https://github.com/your-username/clipboard-manager.git
-cd clipboard-manager/app
+git clone https://github.com/kolhesuraj/clipboard-manager-app.git
+cd clipboard-manager-app
 npm install
 npm run dev
 ```
@@ -58,7 +58,7 @@ The trigger server listens on a Unix socket at `app.getPath('userData')/trigger.
 ## Making Changes
 
 1. **Fork** the repository and create a feature branch: `git checkout -b feat/my-change`
-2. Make your changes in `app/src/`
+2. Make your changes in `clipboard-manager-app/src/`
 3. Run `npm run build` to verify the build passes
 4. Test manually — open the app, trigger the shortcut, paste into both a terminal and a text editor
 5. Open a pull request against `main`

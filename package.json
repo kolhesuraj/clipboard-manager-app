@@ -8,7 +8,7 @@
     "email": "surajkolhe214@gmail.com"
   },
   "license": "MIT",
-  "homepage": "https://github.com/kolhesuraj/clipboard-manager",
+  "homepage": "https://github.com/kolhesuraj/clipboard-manager-website",
   "scripts": {
     "dev": "ELECTRON_EXEC_PATH=scripts/electron electron-vite dev",
     "build": "electron-vite build",
@@ -65,11 +65,24 @@
     "appId": "com.clipboardmanager.app",
     "productName": "Clipboard Manager",
     "icon": "resources/icon-512.png",
-    "files": ["out/**/*", "resources/icon-512.png"],
+    "files": [
+      "out/**/*",
+      "resources/icon-512.png"
+    ],
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "resources/icon-512.png",
       "category": "Utility",
@@ -77,7 +90,12 @@
       "synopsis": "Clipboard history manager"
     },
     "deb": {
-      "depends": ["libnotify4", "libxtst6", "libnss3", "libsecret-1-0"]
+      "depends": [
+        "libnotify4",
+        "libxtst6",
+        "libnss3",
+        "libsecret-1-0"
+      ]
     },
     "publish": {
       "provider": "github",
