@@ -144,10 +144,9 @@ app.whenReady().then(() => {
       }
     );
 
-    // Show window when launched explicitly by the user (e.g. from Show Apps).
-    // hasFocusedWindow() returns false during autostart on login (no focused window yet),
-    // so the window stays hidden on autostart and only appears on manual launch.
-    if (hasFocusedWindow()) {
+    // Show window when launched explicitly by the user (Show Apps, terminal).
+    // Autostart passes --autostart so the window stays hidden on login.
+    if (!process.argv.includes('--autostart')) {
       showWindowNearCursor();
       mainWindow.show();
       mainWindow.focus();

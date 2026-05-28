@@ -43,7 +43,7 @@ Version=1.0
 Type=Application
 Name=Clipboard Manager
 Comment=Fast clipboard history manager for Linux
-Exec=/opt/clipboard-manager/clipboard-manager --no-sandbox
+Exec=/opt/clipboard-manager/clipboard-manager --no-sandbox --autostart
 Icon=clipboard-manager
 Hidden=false
 NoDisplay=false
@@ -61,7 +61,7 @@ if [ -n "$CURRENT_USER" ]; then
             export DISPLAY=:0
             export XDG_RUNTIME_DIR=/run/user/$USER_ID
             export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
-            nohup /opt/clipboard-manager/clipboard-manager --no-sandbox >/dev/null 2>&1 &
+            nohup /opt/clipboard-manager/clipboard-manager --no-sandbox --autostart >/dev/null 2>&1 &
         " "$CURRENT_USER" || true
     fi
 fi
