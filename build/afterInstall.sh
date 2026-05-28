@@ -28,6 +28,15 @@ echo ""
 # ── /usr/bin symlink ──────────────────────────────────────────────────────
 ln -sf /opt/clipboard-manager/clipboard-manager /usr/bin/clipboard-manager
 
+# ── Patch --no-sandbox into the system .desktop file ─────────────────────
+# electron-builder generates the Exec line without --no-sandbox, which causes
+# Chromium's sandbox check to abort before any JS runs. Patching it here
+# ensures GNOME Show Apps launches with the flag present.
+DESKTOP_FILE="/usr/share/applications/clipboard-manager.desktop"
+if [ -f "$DESKTOP_FILE" ]; then
+    sed -i 's|^Exec=\(.*clipboard-manager\) *\(%U\)\?$|Exec=\1 --no-sandbox \2|' "$DESKTOP_FILE"
+fi
+
 # ── App icon → system icon theme (makes it show in GNOME Show Apps) ───────
 install -Dm644 /opt/clipboard-manager/resources/icon-512.png \
     /usr/share/icons/hicolor/512x512/apps/clipboard-manager.png
