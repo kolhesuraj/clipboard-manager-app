@@ -23,7 +23,7 @@ jobs:
         run: npm ci
 
       - name: Build & package
-        run: npm run dist
+        run: npx electron-vite build && npx electron-builder --linux --publish never
 
       - name: Read version
         id: pkg
