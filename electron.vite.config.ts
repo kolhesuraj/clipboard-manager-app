@@ -2,19 +2,12 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
-const watcherOptions = {
-  ignored: ['**/node_modules/**', '**/out/**', '**/dist/**'],
-  usePolling: false
-}
-
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
-    watch: watcherOptions
+    plugins: [externalizeDepsPlugin()]
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
-    watch: watcherOptions
+    plugins: [externalizeDepsPlugin()]
   },
   renderer: {
     resolve: {
@@ -24,7 +17,10 @@ export default defineConfig({
     },
     plugins: [react()],
     server: {
-      watch: watcherOptions
+      watch: {
+        ignored: ['**/node_modules/**', '**/out/**', '**/dist/**'],
+        usePolling: false
+      }
     }
   }
 })

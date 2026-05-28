@@ -13,6 +13,7 @@ import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
 
+app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.disableHardwareAcceleration();
@@ -79,6 +80,8 @@ function showWindowNearCursor(): void {
   mainWindow.setPosition(x, y);
 }
 
+const gsettingsOpts = { timeout: 3000 } as const
+
 function registerGnomeShortcut(): void {
   const BINDING_PATH =
     '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/clipboard-manager/';
@@ -89,20 +92,20 @@ function registerGnomeShortcut(): void {
     'org.gnome.settings-daemon.plugins.media-keys',
     'custom-keybindings',
     `['${BINDING_PATH}']`,
-  ]);
-  spawnSync('gsettings', ['set', KEY, 'name', 'Clipboard Manager']);
+  ], gsettingsOpts);
+  spawnSync('gsettings', ['set', KEY, 'name', 'Clipboard Manager'], gsettingsOpts);
   spawnSync('gsettings', [
     'set',
     KEY,
     'command',
     `curl -s --unix-socket ${getSocketPath()} http://localhost/toggle`,
-  ]);
-  spawnSync('gsettings', ['set', KEY, 'binding', '<Super><Shift>v']);
+  ], gsettingsOpts);
+  spawnSync('gsettings', ['set', KEY, 'binding', '<Super><Shift>v'], gsettingsOpts);
 }
 
 app.whenReady().then(() => {
   loadSettings();
-  spawnSync('gsettings', ['set', 'org.gnome.desktop.interface', 'toolkit-accessibility', 'true']);
+  spawnSync('gsettings', ['set', 'org.gnome.desktop.interface', 'toolkit-accessibility', 'true'], gsettingsOpts);
   registerGnomeShortcut();
 
   initDatabase();

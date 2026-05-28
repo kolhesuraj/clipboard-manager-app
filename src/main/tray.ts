@@ -6,7 +6,10 @@ let tray: Tray | null = null
 
 function iconForTheme(isDark: boolean) {
   const name = isDark ? 'icon-dark.png' : 'icon-light.png'
-  return nativeImage.createFromPath(path.join(__dirname, '../../resources', name))
+  const base = app.isPackaged
+    ? process.resourcesPath
+    : path.join(__dirname, '../../resources')
+  return nativeImage.createFromPath(path.join(base, name))
     .resize({ width: 22, height: 22 })
 }
 

@@ -63,11 +63,17 @@
   },
   "build": {
     "appId": "com.clipboardmanager.app",
-    "productName": "Clipboard Manager",
+    "productName": "clipboard-manager",
+    "executableName": "clipboard-manager",
     "icon": "resources/icon-512.png",
     "files": [
-      "out/**/*",
-      "resources/icon-512.png"
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
     ],
     "linux": {
       "target": [
@@ -87,20 +93,32 @@
       "icon": "resources/icon-512.png",
       "category": "Utility",
       "description": "Fast clipboard history manager for Linux",
-      "synopsis": "Clipboard history manager"
+      "synopsis": "Clipboard history manager",
+      "desktop": {
+        "Name": "Clipboard Manager",
+        "Comment": "Fast clipboard history manager for Linux",
+        "StartupNotify": "false",
+        "Terminal": "false"
+      }
     },
     "deb": {
+      "afterInstall": "build/afterInstall.sh",
+      "afterRemove": "build/afterRemove.sh",
       "depends": [
         "libnotify4",
         "libxtst6",
         "libnss3",
         "libsecret-1-0"
+      ],
+      "recommends": [
+        "wtype",
+        "xdotool"
       ]
     },
     "publish": {
       "provider": "github",
       "owner": "kolhesuraj",
-      "repo": "clipboard-manager"
+      "repo": "clipboard-manager-app"
     }
   }
 }

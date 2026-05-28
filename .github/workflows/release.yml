@@ -1,0 +1,59 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package
+        run: npm run dist
+
+      - name: Read version
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Delete existing release (if any)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "v${{ steps.pkg.outputs.version }}" --cleanup-tag --yes 2>/dev/null || true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.pkg.outputs.version }}
+          gh release create "v${VERSION}" \
+            "dist/clipboard-manager_${VERSION}_amd64.deb" \
+            "dist/clipboard-manager-${VERSION}.AppImage" \
+            --title "Clipboard Manager v${VERSION}" \
+            --notes "## Install on Ubuntu / Debian
+          \`\`\`bash
+          sudo apt install ./clipboard-manager_${VERSION}_amd64.deb
+          \`\`\`
+
+          ## AppImage (any Linux distro)
+          \`\`\`bash
+          chmod +x clipboard-manager-${VERSION}.AppImage
+          ./clipboard-manager-${VERSION}.AppImage
+          \`\`\`
+
+          ## Requirements
+          - GNOME desktop (Ubuntu 22.04+)
+          - Shortcut: **Super + Shift + V**"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import SearchBar from './components/SearchBar.tsx'
 import ClipboardList from './components/ClipboardList.tsx'
+import Preferences from './components/Preferences.tsx'
 import './App.css'
 
 export interface ClipboardItem {
@@ -34,6 +35,7 @@ declare global {
 }
 
 type ThemePref = 'system' | 'dark' | 'light'
+type View = 'main' | 'prefs'
 
 function applyTheme(pref: ThemePref, systemIsDark: boolean) {
   const isDark = pref === 'system' ? systemIsDark : pref === 'dark'
@@ -41,12 +43,15 @@ function applyTheme(pref: ThemePref, systemIsDark: boolean) {
 }
 
 export default function App() {
+  const [view, setView] = useState<View>('main')
   const [items, setItems] = useState<ClipboardItem[]>([])
   const [search, setSearch] = useState('')
   const [themePref, setThemePref] = useState<ThemePref>('system')
   const [systemIsDark, setSystemIsDark] = useState(true)
   const [toast, setToast] = useState(false)
   const [warning, setWarning] = useState(false)
+  const [mutterConsent, setMutterConsentState] = useState(false)
+  const [silentPaste, setSilentPaste] = useState(true)
 
   const load = useCallback(
     async (q = search) => setItems(await window.electronAPI.getItems(q)),
@@ -72,6 +77,8 @@ export default function App() {
     load('')
     window.electronAPI.onClipboardChanged(() => load())
     window.electronAPI.checkPasteTool().then(({ silent, mutterAllowed }) => {
+      setSilentPaste(silent)
+      setMutterConsentState(mutterAllowed)
       if (!silent && !mutterAllowed) setWarning(true)
     })
     window.electronAPI.onPasteToolMissing(() => {
@@ -123,9 +130,11 @@ export default function App() {
     load('')
   }
 
-  const handleAllowMutter = async () => {
-    await window.electronAPI.setMutterConsent(true)
-    setWarning(false)
+  const handleMutterConsentChange = async (value: boolean) => {
+    await window.electronAPI.setMutterConsent(value)
+    setMutterConsentState(value)
+    if (value) setWarning(false)
+    else if (!silentPaste) setWarning(true)
   }
 
   return (
@@ -142,45 +151,69 @@ export default function App() {
           <button className="btn-theme" onClick={cycleTheme} title={`Theme: ${themePref}`}>
             {themeIcon}
           </button>
-          <button className="btn-clear" onClick={handleClearAll} title="Clear unpinned history">
-            Clear
-          </button>
+          {view === 'main' && (
+            <>
+              <button
+                className="btn-icon"
+                onClick={() => setView('prefs')}
+                title="Preferences"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              <button className="btn-clear" onClick={handleClearAll} title="Clear unpinned history">
+                Clear
+              </button>
+            </>
+          )}
         </div>
       </header>
 
-      {warning && (
-        <div className="warning-banner">
-          <div className="warning-banner-row">
-            <span>⚠️ Auto-paste unavailable — wtype/xdotool not found</span>
-            <button className="warning-dismiss" onClick={() => setWarning(false)}>✕</button>
-          </div>
-          <div className="warning-banner-options">
-            <button className="warning-allow" onClick={handleAllowMutter}>
-              Allow via screen recording
-            </button>
-            <span className="warning-or">or install silently:</span>
-          </div>
-          <div className="warning-banner-cmd">
-            <code>sudo apt install wtype</code>
-            <button className="toast-copy" onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}>Copy</button>
-          </div>
-          <div className="warning-note">Screen recording method briefly shows the indicator</div>
-        </div>
+      {view === 'prefs' ? (
+        <Preferences
+          mutterConsent={mutterConsent}
+          onMutterConsentChange={handleMutterConsentChange}
+          onBack={() => setView('main')}
+        />
+      ) : (
+        <>
+          {warning && (
+            <div className="warning-banner">
+              <div className="warning-banner-row">
+                <span>⚠️ Auto-paste unavailable — wtype/xdotool not found</span>
+                <button className="warning-dismiss" onClick={() => setWarning(false)}>✕</button>
+              </div>
+              <div className="warning-banner-options">
+                <button className="warning-allow" onClick={() => handleMutterConsentChange(true)}>
+                  Allow via screen recording
+                </button>
+                <span className="warning-or">or install silently:</span>
+              </div>
+              <div className="warning-banner-cmd">
+                <code>sudo apt install wtype</code>
+                <button className="toast-copy" onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}>Copy</button>
+              </div>
+              <div className="warning-note">Screen recording method briefly shows the indicator</div>
+            </div>
+          )}
+
+          <SearchBar value={search} onChange={handleSearch} />
+
+          <ClipboardList
+            items={items}
+            onCopy={handleCopy}
+            onDelete={handleDelete}
+            onPin={handlePin}
+          />
+
+          <footer className="footer">
+            {items.length} item{items.length !== 1 ? 's' : ''}&nbsp;·&nbsp;
+            Super+Shift+V to toggle&nbsp;·&nbsp;Esc to close
+          </footer>
+        </>
       )}
-
-      <SearchBar value={search} onChange={handleSearch} />
-
-      <ClipboardList
-        items={items}
-        onCopy={handleCopy}
-        onDelete={handleDelete}
-        onPin={handlePin}
-      />
-
-      <footer className="footer">
-        {items.length} item{items.length !== 1 ? 's' : ''}&nbsp;·&nbsp;
-        Super+Shift+V to toggle&nbsp;·&nbsp;Esc to close
-      </footer>
 
       {toast && (
         <div className="toast-error">
