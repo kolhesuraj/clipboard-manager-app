@@ -28,6 +28,13 @@ echo ""
 # ── /usr/bin symlink ──────────────────────────────────────────────────────
 ln -sf /opt/clipboard-manager/clipboard-manager /usr/bin/clipboard-manager
 
+# ── App icon → system icon theme (makes it show in GNOME Show Apps) ───────
+install -Dm644 /opt/clipboard-manager/resources/icon-512.png \
+    /usr/share/icons/hicolor/512x512/apps/clipboard-manager.png
+install -Dm644 /opt/clipboard-manager/resources/icon-512.png \
+    /usr/share/icons/hicolor/256x256/apps/clipboard-manager.png
+gtk-update-icon-cache /usr/share/icons/hicolor --force --quiet 2>/dev/null || true
+
 # ── XDG autostart (runs on every subsequent login) ────────────────────────
 mkdir -p /etc/xdg/autostart
 cat > /etc/xdg/autostart/clipboard-manager.desktop << 'EOF'

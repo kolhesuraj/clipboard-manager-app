@@ -143,6 +143,15 @@ app.whenReady().then(() => {
         lastFocusedIsTerminal = isTerminalFocused();
       }
     );
+
+    // Show window when launched explicitly by the user (e.g. from Show Apps).
+    // hasFocusedWindow() returns false during autostart on login (no focused window yet),
+    // so the window stays hidden on autostart and only appears on manual launch.
+    if (hasFocusedWindow()) {
+      showWindowNearCursor();
+      mainWindow.show();
+      mainWindow.focus();
+    }
   }
 });
 
