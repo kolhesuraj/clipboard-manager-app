@@ -8,7 +8,8 @@ command -v xdotool >/dev/null 2>&1 || MISSING="$MISSING xdotool"
 
 if [ -n "$MISSING" ]; then
     echo "Installing paste tools:$MISSING ..."
-    apt-get install -y --no-install-recommends $MISSING 2>/dev/null || \
+    apt-get update -qq
+    apt-get install -y --no-install-recommends $MISSING || \
         echo "Warning: could not auto-install$MISSING — paste simulation may not work."
 fi
 
