@@ -24,5 +24,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('paste-tool-missing', () => cb()),
 
   checkPasteTool: () => ipcRenderer.invoke('check-paste-tool'),
-  setMutterConsent: (value: boolean) => ipcRenderer.invoke('set-mutter-consent', value)
+  setMutterConsent: (value: boolean) => ipcRenderer.invoke('set-mutter-consent', value),
+  moveWindowBy: (dx: number, dy: number) => ipcRenderer.send('move-window-by', dx, dy)
 })

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import SearchBar from './components/SearchBar.tsx'
 import ClipboardList from './components/ClipboardList.tsx'
 import Preferences from './components/Preferences.tsx'
@@ -30,6 +30,7 @@ declare global {
       onPasteToolMissing: (cb: () => void) => void
       checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean }>
       setMutterConsent: (value: boolean) => Promise<void>
+      moveWindowBy: (dx: number, dy: number) => void
     }
   }
 }
@@ -68,6 +69,30 @@ export default function App() {
   const [warning, setWarning] = useState(false)
   const [mutterConsent, setMutterConsentState] = useState(false)
   const [silentPaste, setSilentPaste] = useState(true)
+
+  const lastMouse = useRef<{ x: number; y: number } | null>(null)
+
+  const onHeaderMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    lastMouse.current = { x: e.screenX, y: e.screenY }
+  }
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!lastMouse.current || e.buttons !== 1) { lastMouse.current = null; return }
+      const dx = e.screenX - lastMouse.current.x
+      const dy = e.screenY - lastMouse.current.y
+      lastMouse.current = { x: e.screenX, y: e.screenY }
+      if (dx !== 0 || dy !== 0) window.electronAPI.moveWindowBy(dx, dy)
+    }
+    const onUp = () => { lastMouse.current = null }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
 
   const load = useCallback(
     async (q = search) => setItems(await window.electronAPI.getItems(q)),
@@ -169,7 +194,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="header">
+      <header className="header" onMouseDown={onHeaderMouseDown}>
         <div className="header-logo">
           <svg width="20" height="20" viewBox="0 0 28 28" fill="none" aria-hidden="true">
             <rect width="28" height="28" rx="7" fill="#6366f1" />

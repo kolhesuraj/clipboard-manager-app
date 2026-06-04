@@ -49,13 +49,23 @@ function saveSettings(): void {
 }
 
 function createWindow(): void {
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  const width  = Math.min(500, Math.floor(sw * 0.5))
+  const height = Math.min(640, sh)
+
   mainWindow = new BrowserWindow({
-    width: 500,
-    height: 640,
+    width,
+    height,
+    minWidth: 320,
+    minHeight: 400,
+    maxWidth: Math.floor(sw * 0.5),
+    maxHeight: sh,
     show: false,
     frame: false,
     transparent: true,
     resizable: true,
+    maximizable: false,
+    fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
     webPreferences: {
@@ -179,6 +189,11 @@ app.on('window-all-closed', () => {
 });
 
 // IPC handlers
+ipcMain.on('move-window-by', (_, dx: number, dy: number) => {
+  const [x, y] = mainWindow?.getPosition() ?? [0, 0];
+  mainWindow?.setPosition(Math.round(x + dx), Math.round(y + dy));
+});
+
 ipcMain.handle('get-native-theme', () => nativeTheme.shouldUseDarkColors);
 ipcMain.handle('set-native-theme', (_, source: 'system' | 'dark' | 'light') => {
   nativeTheme.themeSource = source;
