@@ -37,6 +37,22 @@ declare global {
 type ThemePref = 'system' | 'dark' | 'light'
 type View = 'main' | 'prefs'
 
+function CopyCmd({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      className={`toast-copy${copied ? ' toast-copy--done' : ''}`}
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }}
+    >
+      {copied ? '✓ Copied!' : 'Copy'}
+    </button>
+  )
+}
+
 function applyTheme(pref: ThemePref, systemIsDark: boolean) {
   const isDark = pref === 'system' ? systemIsDark : pref === 'dark'
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
@@ -212,7 +228,7 @@ export default function App() {
               </div>
               <div className="warning-banner-cmd">
                 <code>sudo apt install wtype</code>
-                <button className="toast-copy" onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}>Copy</button>
+                <CopyCmd text="sudo apt install wtype" />
               </div>
               <div className="warning-note">Screen recording method briefly shows the indicator</div>
             </div>
@@ -239,13 +255,7 @@ export default function App() {
           <span>⚠️ Copied — paste manually with Ctrl+V</span>
           <div className="toast-hint">
             <code>sudo apt install wtype</code>
-            <button
-              className="toast-copy"
-              onClick={() => navigator.clipboard.writeText('sudo apt install wtype')}
-              title="Copy command"
-            >
-              Copy
-            </button>
+            <CopyCmd text="sudo apt install wtype" />
           </div>
         </div>
       )}
