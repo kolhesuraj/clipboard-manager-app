@@ -77,13 +77,13 @@ async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
   return runAsync('wtype', args)
 }
 
-export async function simulatePaste(isTerminal: boolean): Promise<void> {
+export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<void> {
   const label = isTerminal ? 'Ctrl+Shift+V (terminal)' : 'Ctrl+V'
   console.log(`[paste] sending ${label}`)
 
   if (await simulateViaXdotool(isTerminal)) { console.log('[paste] xdotool ok'); return }
   if (await simulateViaWtype(isTerminal))   { console.log('[paste] wtype ok');   return }
-  if (await simulateViaMutter(isTerminal))  { console.log('[paste] mutter ok');  return }
+  if (mutterConsent && await simulateViaMutter(isTerminal)) { console.log('[paste] mutter ok'); return }
 
   console.warn('[paste] Could not simulate paste — content is in clipboard, paste manually.')
 }

@@ -244,7 +244,7 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
       mainWindow.once('hide', () => setTimeout(r, 80));
       mainWindow.hide();
     });
-    await simulatePaste(lastFocusedIsTerminal);
+    await simulatePaste(lastFocusedIsTerminal, settings.mutterConsent);
   } catch (err) {
     console.error('[copy-and-paste] CRASH:', err);
   }
