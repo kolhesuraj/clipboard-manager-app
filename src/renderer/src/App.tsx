@@ -17,7 +17,7 @@ declare global {
     electronAPI: {
       getItems: (search: string) => Promise<ClipboardItem[]>
       copyItem: (content: string) => Promise<boolean>
-      copyAndPaste: (content: string) => Promise<boolean>
+      copyAndPaste: (content: string) => Promise<'blocked' | 'ok'>
       deleteItem: (id: number) => Promise<boolean>
       clearHistory: () => Promise<boolean>
       togglePin: (id: number) => Promise<boolean>
@@ -28,6 +28,7 @@ declare global {
       onClearHistoryRequest: (cb: () => void) => void
       onNativeThemeChanged: (cb: (isDark: boolean) => void) => void
       onPasteToolMissing: (cb: () => void) => void
+      onPasteBlocked: (cb: () => void) => void
       onWindowShown: (cb: () => void) => void
       checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean }>
       setMutterConsent: (value: boolean) => Promise<void>
@@ -100,6 +101,10 @@ export default function App() {
     [search]
   )
 
+  // Keep a ref so one-time IPC listeners always call the latest load.
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+
   useEffect(() => {
     window.electronAPI.getNativeTheme().then((isDark) => {
       setSystemIsDark(isDark)
@@ -116,41 +121,35 @@ export default function App() {
   }, [themePref, systemIsDark])
 
   useEffect(() => {
-    load('')
-    window.electronAPI.onClipboardChanged(() => load())
-    window.electronAPI.checkPasteTool().then(({ silent, mutterAllowed }) => {
+    loadRef.current('')
+
+    const syncPasteTool = async () => {
+      const { silent, mutterAllowed } = await window.electronAPI.checkPasteTool()
       setSilentPaste(silent)
       setMutterConsentState(mutterAllowed)
-      if (!silent && !mutterAllowed) setWarning(true)
-    })
+      setWarning(!silent && !mutterAllowed)
+    }
+    syncPasteTool()
+
+    window.electronAPI.onClipboardChanged(() => loadRef.current())
     window.electronAPI.onPasteToolMissing(() => {
       setToast(true)
       setTimeout(() => setToast(false), 5000)
     })
+    window.electronAPI.onPasteBlocked(() => setWarning(true))
     window.electronAPI.onClearHistoryRequest(async () => {
       await window.electronAPI.clearHistory()
-      load('')
+      loadRef.current('')
     })
-
-    // Re-check paste tool every time the window is shown so installs and
-    // removals of wtype/xdotool are reflected immediately without restart.
-    const recheckPasteTool = async () => {
-      const { silent, mutterAllowed } = await window.electronAPI.checkPasteTool()
-      setSilentPaste(silent)
-      setMutterConsentState(mutterAllowed)
-      if (silent || mutterAllowed) setWarning(false)
-      else setWarning(true)
-    }
-    window.electronAPI.onWindowShown(recheckPasteTool)
+    // Re-check paste tool on every show so installs/removals take effect without restart.
+    window.electronAPI.onWindowShown(syncPasteTool)
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') window.electronAPI.hideWindow()
     }
     window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [load])
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const cycleTheme = () => {
     const next: ThemePref = themePref === 'system' ? 'dark' : themePref === 'dark' ? 'light' : 'system'
@@ -165,8 +164,8 @@ export default function App() {
     load(q)
   }
 
-  const handleCopy = async (content: string) => {
-    await window.electronAPI.copyAndPaste(content)
+  const handleCopy = async (content: string): Promise<'blocked' | 'ok'> => {
+    return window.electronAPI.copyAndPaste(content)
   }
 
   const handleDelete = async (id: number) => {
@@ -239,27 +238,27 @@ export default function App() {
         />
       ) : (
         <>
+          <SearchBar value={search} onChange={handleSearch} />
           {warning && (
             <div className="warning-banner">
-              <div className="warning-banner-row">
-                <span>⚠️ Auto-paste unavailable — wtype/xdotool not found</span>
+              <div className="warning-banner-row warning-banner-row--spread">
+                <span>⚠️ Auto-paste unavailable — <b>wtype</b> not installed · xdotool triggers screen recording on GNOME 46+</span>
                 <button className="warning-dismiss" onClick={() => setWarning(false)}>✕</button>
               </div>
-              <div className="warning-banner-options">
-                <button className="warning-allow" onClick={() => handleMutterConsentChange(true)}>
+              <div className="warning-banner-row">
+                <button
+                  className="warning-allow"
+                  title="Uses GNOME Mutter RemoteDesktop — briefly shows the screen-recording indicator in the top bar"
+                  onClick={() => handleMutterConsentChange(true)}
+                >
                   Allow via screen recording
                 </button>
-                <span className="warning-or">or install silently:</span>
-              </div>
-              <div className="warning-banner-cmd">
-                <code>sudo apt install wtype</code>
+                <span className="warning-or">or install wtype:</span>
+                <code className="warning-cmd-inline">sudo apt install wtype</code>
                 <CopyCmd text="sudo apt install wtype" />
               </div>
-              <div className="warning-note">Screen recording method briefly shows the indicator</div>
             </div>
           )}
-
-          <SearchBar value={search} onChange={handleSearch} />
 
           <ClipboardList
             items={items}

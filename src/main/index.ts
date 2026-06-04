@@ -6,7 +6,7 @@ import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './d
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
 import { createTray, updateTrayTheme } from './tray.ts';
 import { simulatePaste } from './paste.ts';
-import { isTerminalFocused, hasFocusedWindow } from './utils/focus.ts';
+import { getFocusState } from './utils/focus.ts';
 import { hasSilentPasteTool } from './utils/shell.ts';
 import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-server.ts';
 
@@ -157,8 +157,9 @@ app.whenReady().then(() => {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
-        if (!hasFocusedWindow()) return;
-        lastFocusedIsTerminal = isTerminalFocused();
+        const { focused, isTerminal } = getFocusState();
+        if (!focused) return;
+        lastFocusedIsTerminal = isTerminal;
         showWindowNearCursor();
         mainWindow.show();
         mainWindow.focus();
@@ -168,8 +169,9 @@ app.whenReady().then(() => {
     startTriggerServer(
       () => mainWindow,
       () => {
-        if (!hasFocusedWindow()) return;
-        lastFocusedIsTerminal = isTerminalFocused();
+        const { focused, isTerminal } = getFocusState();
+        if (!focused) return;
+        lastFocusedIsTerminal = isTerminal;
       }
     );
 
@@ -236,11 +238,9 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
     copyToClipboard(content);
 
-    const silentAvailable = hasSilentPasteTool();
-
-    if (!silentAvailable && !settings.mutterConsent) {
-      mainWindow?.webContents.send('paste-tool-missing');
-      return true;
+    if (!hasSilentPasteTool() && !settings.mutterConsent) {
+      mainWindow?.webContents.send('paste-blocked');
+      return 'blocked';
     }
 
     // Wait for the window to actually be hidden before simulating paste,
@@ -251,13 +251,12 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
       mainWindow.hide();
     });
 
-    // Only allow Mutter fallback when no silent tool is installed at all.
-    // If wtype/xdotool is installed but fails at runtime, do not silently
-    // escalate to Mutter — that would trigger the remote desktop prompt
-    // even when the user never intended to use it.
-    await simulatePaste(lastFocusedIsTerminal, !silentAvailable && settings.mutterConsent);
+    const pasted = await simulatePaste(lastFocusedIsTerminal, settings.mutterConsent);
+    if (!pasted) {
+      mainWindow?.webContents.send('paste-tool-missing');
+    }
   } catch (err) {
     console.error('[copy-and-paste] CRASH:', err);
   }
-  return true;
+  return 'ok';
 });

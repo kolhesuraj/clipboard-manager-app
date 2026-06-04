@@ -196,6 +196,7 @@ body {
   cursor: pointer;
   transition: background 0.1s;
   min-width: 0;
+  position: relative;
 }
 .clipboard-item:hover { background: var(--indigo-hover); }
 .clipboard-item.active { background: var(--indigo-dim); }
@@ -252,6 +253,29 @@ body {
 }
 .clipboard-item:hover .item-actions { opacity: 1; }
 
+.item-copied-badge {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: badge-in 0.12s ease;
+  background: var(--indigo);
+}
+.item-copied-badge--blocked {
+  background: #dc2626;
+}
+@keyframes badge-in {
+  from { opacity: 0; transform: translateY(-50%) scale(0.85); }
+  to   { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
 .action-btn {
   background: transparent;
   border: none;
@@ -289,12 +313,12 @@ body {
 
 /* ── Warning banner ────────────────────────────────────────────────────── */
 .warning-banner {
-  background: #431407;
-  border-bottom: 1px solid #f97316;
-  padding: 8px 12px;
+  background: #450a0a;
+  border-bottom: 1px solid rgba(220, 38, 38, 0.5);
+  padding: 5px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   font-size: 11.5px;
   color: #fed7aa;
   flex-shrink: 0;
@@ -302,54 +326,64 @@ body {
 .warning-banner-row {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+.warning-banner-row--spread {
   justify-content: space-between;
-  gap: 8px;
+}
+.warning-cmd-inline {
+  font-family: var(--font-mono);
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 1px 5px;
+  user-select: text;
+  cursor: text;
+  color: #fdba74;
+  font-size: 11px;
+  white-space: nowrap;
 }
 .warning-banner-cmd {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
 }
 .warning-banner-cmd code {
   font-family: var(--font-mono);
   background: rgba(255,255,255,0.08);
-  border-radius: 4px;
-  padding: 2px 6px;
+  border-radius: 3px;
+  padding: 1px 5px;
   user-select: text;
   cursor: text;
   color: #fdba74;
+  font-size: 10px;
 }
 .warning-dismiss {
   background: none;
   border: none;
   color: #fdba74;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   padding: 0 2px;
   flex-shrink: 0;
+  line-height: 1;
 }
 .warning-dismiss:hover { color: #fff; }
-.warning-banner-options {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .warning-allow {
   background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fed7aa;
-  border-radius: 5px;
-  padding: 3px 10px;
+  border-radius: 3px;
+  padding: 2px 8px;
   font-size: 11px;
   font-family: var(--font-ui);
   cursor: pointer;
   transition: background 0.15s;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .warning-allow:hover { background: rgba(255, 255, 255, 0.18); }
-.warning-or { color: #92542a; font-size: 10.5px; }
-.warning-note { color: #92542a; font-size: 10px; }
+.warning-or { color: #c2622a; font-size: 11px; white-space: nowrap; }
 
 /* ── Icon button (gear) ────────────────────────────────────────────────── */
 .btn-icon {

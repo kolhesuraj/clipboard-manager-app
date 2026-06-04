@@ -1,43 +1,50 @@
 import { execFileSync, spawnSync } from 'child_process'
 
+// WM_CLASS substrings for X11/XWayland terminals (matched lowercase).
 const TERMINAL_WM_CLASSES = [
   'terminal', 'konsole', 'xterm', 'alacritty', 'kitty',
-  'tilix', 'terminator', 'gnome-terminal',
+  'tilix', 'terminator', 'gnome-terminal', 'kgx', 'ptyxis',
 ]
 
-export function isTerminalFocused(): boolean {
+// Process names for native Wayland terminals (no X11 window, xprop returns 0x0).
+const TERMINAL_PROCS = [
+  'gnome-terminal-', 'kgx', 'kitty', 'alacritty', 'foot',
+  'wezterm-gui', 'tilix', 'xfce4-terminal', 'konsole', 'terminator', 'ptyxis',
+]
+
+/** Returns focused state and terminal detection in a single xprop call.
+ *
+ *  For native Wayland windows (xprop returns 0x0), GNOME Shell.Eval is disabled
+ *  on GNOME 46+ so we skip it entirely and fall back to process-name detection.
+ *  focused is always true in that path — the global shortcut wouldn't fire
+ *  unless the user was actively in a window. */
+export function getFocusState(): { focused: boolean; isTerminal: boolean } {
+  // Step 1: get the active X11 window ID.
+  let winId: string | null = null
   try {
     const out = execFileSync('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { encoding: 'utf8' }).trim()
-    const winId = out.split(/\s+/).pop() || ''
+    const id = out.split(/\s+/).pop() || ''
+    if (id && id !== '0x0' && id !== '0x00000000') winId = id
+  } catch { /* xprop unavailable */ }
 
-    if (!winId || winId === '0x0' || winId === '0x00000000') {
-      const pg = spawnSync('pgrep', ['-x', 'gnome-terminal-'], { encoding: 'utf8' })
-      return pg.status === 0
-    }
-
-    const wmClass = execFileSync('xprop', ['-id', winId, 'WM_CLASS'], { encoding: 'utf8' }).toLowerCase()
-    return TERMINAL_WM_CLASSES.some((t) => wmClass.includes(t))
-  } catch {
-    return false
+  // Step 2: valid X11/XWayland window — check WM_CLASS.
+  if (winId) {
+    try {
+      const raw = execFileSync('xprop', ['-id', winId, 'WM_CLASS'], { encoding: 'utf8' })
+      // xprop writes "WM_CLASS: not found." to stdout (not stderr) when the
+      // property is absent — this happens for native Wayland proxy windows.
+      // Only trust the result if the property was actually returned.
+      if (raw.toLowerCase().includes('wm_class(string)')) {
+        const wmClass = raw.toLowerCase()
+        return { focused: true, isTerminal: TERMINAL_WM_CLASSES.some(t => wmClass.includes(t)) }
+      }
+    } catch { /* fall through */ }
   }
-}
 
-export function hasFocusedWindow(): boolean {
-  try {
-    const out = execFileSync('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { encoding: 'utf8' }).trim()
-    const winId = out.split(/\s+/).pop() || ''
-    if (winId && winId !== '0x0' && winId !== '0x00000000') return true
-
-    // winId is 0x0 — native Wayland app OR empty desktop. Ask GNOME Shell directly.
-    const result = execFileSync('gdbus', [
-      'call', '--session',
-      '--dest', 'org.gnome.Shell',
-      '--object-path', '/org/gnome/Shell',
-      '--method', 'org.gnome.Shell.Eval',
-      'global.get_window_actors().filter(w => w.meta_window.has_focus()).length > 0'
-    ], { encoding: 'utf8' }).trim()
-    return result.includes('true')
-  } catch {
-    return true // if we can't check, allow opening
-  }
+  // Step 3: native Wayland window (0x0) or proxy WM_CLASS failed.
+  // Identify the terminal by checking which known emulators are running.
+  const isTerminal = TERMINAL_PROCS.some(name =>
+    spawnSync('pgrep', ['-x', name], { encoding: 'utf8' }).status === 0
+  )
+  return { focused: true, isTerminal }
 }

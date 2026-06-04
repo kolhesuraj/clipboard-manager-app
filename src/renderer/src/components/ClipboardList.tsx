@@ -3,7 +3,7 @@ import type { ClipboardItem as Item } from '../App'
 
 interface Props {
   items: Item[]
-  onCopy: (content: string) => void
+  onCopy: (content: string) => Promise<'blocked' | 'ok'>
   onDelete: (id: number) => void
   onPin: (id: number) => void
 }

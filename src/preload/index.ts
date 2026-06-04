@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPasteToolMissing: (cb: () => void) =>
     ipcRenderer.on('paste-tool-missing', () => cb()),
 
+  onPasteBlocked: (cb: () => void) =>
+    ipcRenderer.on('paste-blocked', () => cb()),
+
   onWindowShown: (cb: () => void) =>
     ipcRenderer.on('window-shown', () => cb()),
 

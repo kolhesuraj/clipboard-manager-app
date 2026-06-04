@@ -1,26 +1,11 @@
-import { spawn } from 'child_process'
-import { existsSync } from 'fs'
-import { which, runAsync } from './utils/shell.ts'
-
-export function writeToSystemClipboard(text: string): void {
-  if (existsSync('/usr/bin/wl-copy')) {
-    const proc = spawn('wl-copy', [], {
-      env: { ...process.env, WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || 'wayland-0' },
-      detached: true,
-      stdio: ['pipe', 'ignore', 'ignore'],
-    })
-    proc.stdin.write(text)
-    proc.stdin.end()
-    proc.unref()
-  }
-}
+import { which, runAsync, isXtestSilent } from './utils/shell.ts'
 
 function buildMutterScript(isTerminal: boolean): string {
   const keyBlock = isTerminal
     ? `
     CTRL  = dbus.UInt32(65507)
     SHIFT = dbus.UInt32(65505)
-    V     = dbus.UInt32(86)
+    V     = dbus.UInt32(118)
     sess.NotifyKeyboardKeysym(CTRL,  dbus.Boolean(True))
     sess.NotifyKeyboardKeysym(SHIFT, dbus.Boolean(True))
     sess.NotifyKeyboardKeysym(V,     dbus.Boolean(True))
@@ -59,12 +44,19 @@ except Exception as e:
 `.trim()
 }
 
+// Build once — determined entirely by isTerminal.
+const MUTTER_SCRIPT_NORMAL   = buildMutterScript(false)
+const MUTTER_SCRIPT_TERMINAL = buildMutterScript(true)
+
 async function simulateViaMutter(isTerminal: boolean): Promise<boolean> {
-  return runAsync('python3', ['-c', buildMutterScript(isTerminal)])
+  return runAsync('python3', ['-c', isTerminal ? MUTTER_SCRIPT_TERMINAL : MUTTER_SCRIPT_NORMAL])
 }
 
 async function simulateViaXdotool(isTerminal: boolean): Promise<boolean> {
   if (!which('xdotool')) return false
+  // On GNOME 46+, XTEST routes through Mutter RemoteDesktop internally and
+  // triggers the screen-recording indicator — skip it to avoid the prompt.
+  if (!isXtestSilent()) return false
   const keys = isTerminal ? 'ctrl+shift+v' : 'ctrl+v'
   return runAsync('xdotool', ['key', '--clearmodifiers', keys])
 }
@@ -77,13 +69,14 @@ async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
   return runAsync('wtype', args)
 }
 
-export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<void> {
-  const label = isTerminal ? 'Ctrl+Shift+V (terminal)' : 'Ctrl+V'
-  console.log(`[paste] sending ${label}`)
+export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<boolean> {
+  console.log(`[paste] sending ${isTerminal ? 'Ctrl+Shift+V (terminal)' : 'Ctrl+V'}`)
 
-  if (await simulateViaXdotool(isTerminal)) { console.log('[paste] xdotool ok'); return }
-  if (await simulateViaWtype(isTerminal))   { console.log('[paste] wtype ok');   return }
-  if (mutterConsent && await simulateViaMutter(isTerminal)) { console.log('[paste] mutter ok'); return }
+  if (await simulateViaWtype(isTerminal))   { console.log('[paste] wtype ok');   return true }
+  if (await simulateViaXdotool(isTerminal)) { console.log('[paste] xdotool ok'); return true }
+
+  if (mutterConsent && await simulateViaMutter(isTerminal)) { console.log('[paste] mutter ok'); return true }
 
   console.warn('[paste] Could not simulate paste — content is in clipboard, paste manually.')
+  return false
 }

@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import type { ClipboardItem as Item } from '../App'
 
 interface Props {
   item: Item
-  onCopy: (content: string) => void
+  onCopy: (content: string) => Promise<'blocked' | 'ok'>
   onDelete: (id: number) => void
   onPin: (id: number) => void
 }
@@ -16,15 +17,23 @@ function relativeTime(ts: number): string {
 }
 
 export default function ClipboardItem({ item, onCopy, onDelete, onPin }: Props) {
+  const [copied, setCopied] = useState(false)
   const preview = item.content.length > 300 ? item.content.slice(0, 300) + '…' : item.content
+
+  const handleClick = async () => {
+    const result = await onCopy(item.content)
+    if (result === 'blocked') {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    }
+  }
 
   return (
     <li
       className={`clipboard-item${item.pinned ? ' pinned' : ''}`}
-      onClick={() => onCopy(item.content)}
+      onClick={handleClick}
       title="Click to copy and paste"
     >
-      {/* Pin indicator — click to toggle pin */}
       <span
         className="item-pin-indicator"
         title={item.pinned ? 'Unpin' : 'Pin'}
@@ -36,7 +45,8 @@ export default function ClipboardItem({ item, onCopy, onDelete, onPin }: Props) 
         <time className="item-time">{relativeTime(item.created_at)}</time>
       </div>
 
-      {/* Action buttons — appear on hover */}
+      {copied && <div className="item-copied-badge item-copied-badge--blocked">⚠ Paste unavailable — paste manually</div>}
+
       <div className="item-actions" onClick={(e) => e.stopPropagation()}>
         <button
           className="action-btn delete"
