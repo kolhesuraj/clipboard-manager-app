@@ -69,7 +69,15 @@
     "electronLanguages": ["en-US"],
     "afterPack": "build/afterPack.js",
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "!node_modules/better-sqlite3/deps/**",
+      "!node_modules/better-sqlite3/src/**",
+      "!node_modules/prebuild-install/**",
+      "!node_modules/node-abi/**",
+      "!node_modules/tar-stream/**",
+      "!node_modules/tar-fs/**",
+      "!node_modules/readable-stream/**",
+      "!node_modules/buffer/**"
     ],
     "extraResources": [
       {

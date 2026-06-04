@@ -11,6 +11,7 @@ const UNNEEDED = [
   'libGLESv2.so',
   'libEGL.so',
   'libffmpeg.so',
+  'chrome_crashpad_handler',
 ]
 
 exports.default = async function afterPack({ appOutDir }) {
