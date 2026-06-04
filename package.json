@@ -1,6 +1,6 @@
 {
   "name": "clipboard-manager",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Fast clipboard history manager for Linux",
   "main": "./out/main/index.js",
   "author": {
@@ -66,6 +66,8 @@
     "productName": "clipboard-manager",
     "executableName": "clipboard-manager",
     "icon": "resources/icon-512.png",
+    "electronLanguages": ["en-US"],
+    "afterPack": "build/afterPack.js",
     "files": [
       "out/**/*"
     ],
