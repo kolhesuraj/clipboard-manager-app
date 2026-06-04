@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, nativeTheme, screen } from 'electron';
 import { spawnSync } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
@@ -12,6 +12,20 @@ import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-
 
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+
+// ── Platform guard ────────────────────────────────────────────────────────────
+if (process.platform !== 'linux') {
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      'Unsupported Platform',
+      `Clipboard Manager requires Linux with GNOME (Wayland or XWayland).\n\n` +
+      `Current platform: ${process.platform}\n\n` +
+      `The app depends on Linux-specific tools (wtype, xdotool, gsettings) ` +
+      `and GNOME keybindings that are not available on ${process.platform === 'win32' ? 'Windows' : 'macOS'}.`
+    )
+    app.quit()
+  })
+}
 
 app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-gpu');
