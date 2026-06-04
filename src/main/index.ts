@@ -236,7 +236,9 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
     copyToClipboard(content);
 
-    if (!hasSilentPasteTool() && !settings.mutterConsent) {
+    const silentAvailable = hasSilentPasteTool();
+
+    if (!silentAvailable && !settings.mutterConsent) {
       mainWindow?.webContents.send('paste-tool-missing');
       return true;
     }
@@ -248,7 +250,12 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
       mainWindow.once('hide', () => setTimeout(r, 80));
       mainWindow.hide();
     });
-    await simulatePaste(lastFocusedIsTerminal, settings.mutterConsent);
+
+    // Only allow Mutter fallback when no silent tool is installed at all.
+    // If wtype/xdotool is installed but fails at runtime, do not silently
+    // escalate to Mutter — that would trigger the remote desktop prompt
+    // even when the user never intended to use it.
+    await simulatePaste(lastFocusedIsTerminal, !silentAvailable && settings.mutterConsent);
   } catch (err) {
     console.error('[copy-and-paste] CRASH:', err);
   }
