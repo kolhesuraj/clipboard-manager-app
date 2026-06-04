@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
-import { createTray, toggleWindow, updateTrayTheme } from './tray.ts';
+import { createTray, updateTrayTheme } from './tray.ts';
 import { simulatePaste } from './paste.ts';
 import { isTerminalFocused, hasFocusedWindow } from './utils/focus.ts';
 import { hasSilentPasteTool } from './utils/shell.ts';
@@ -128,6 +128,7 @@ function registerGnomeShortcut(): void {
 }
 
 app.whenReady().then(() => {
+  if (process.platform !== 'linux') return;
   loadSettings();
   spawnSync('gsettings', ['set', 'org.gnome.desktop.interface', 'toolkit-accessibility', 'true'], gsettingsOpts);
   registerGnomeShortcut();
@@ -218,9 +219,6 @@ ipcMain.handle('toggle-pin', (_, id: number) => {
 ipcMain.handle('hide-window', () => {
   mainWindow?.hide();
 });
-ipcMain.handle('toggle-window', () => {
-  if (mainWindow) toggleWindow(mainWindow);
-});
 ipcMain.handle('check-paste-tool', () => ({
   silent: hasSilentPasteTool(),
   mutterAllowed: settings.mutterConsent,
@@ -230,9 +228,6 @@ ipcMain.handle('set-mutter-consent', (_, value: boolean) => {
   saveSettings();
 });
 
-// Copy content, hide the window, then simulate Ctrl+V in the previously focused app.
-// Falls back to Mutter RemoteDesktop if the user has consented (shows screen-recording indicator).
-// If neither path is available, keeps the window open and emits paste-tool-missing.
 ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
     copyToClipboard(content);
