@@ -28,6 +28,7 @@ declare global {
       onClearHistoryRequest: (cb: () => void) => void
       onNativeThemeChanged: (cb: (isDark: boolean) => void) => void
       onPasteToolMissing: (cb: () => void) => void
+      onWindowShown: (cb: () => void) => void
       checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean }>
       setMutterConsent: (value: boolean) => Promise<void>
       moveWindowBy: (dx: number, dy: number) => void
@@ -131,8 +132,8 @@ export default function App() {
       load('')
     })
 
-    // Re-check paste tool on every focus so newly installed wtype/xdotool
-    // is picked up immediately and the warning banner updates without restart.
+    // Re-check paste tool every time the window is shown so installs and
+    // removals of wtype/xdotool are reflected immediately without restart.
     const recheckPasteTool = async () => {
       const { silent, mutterAllowed } = await window.electronAPI.checkPasteTool()
       setSilentPaste(silent)
@@ -140,14 +141,13 @@ export default function App() {
       if (silent || mutterAllowed) setWarning(false)
       else setWarning(true)
     }
-    window.addEventListener('focus', recheckPasteTool)
+    window.electronAPI.onWindowShown(recheckPasteTool)
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') window.electronAPI.hideWindow()
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('focus', recheckPasteTool)
       window.removeEventListener('keydown', onKey)
     }
   }, [load])

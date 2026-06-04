@@ -87,6 +87,10 @@ function createWindow(): void {
       mainWindow.hide();
     }
   });
+
+  mainWindow.on('show', () => {
+    mainWindow?.webContents.send('window-shown');
+  });
 }
 
 function showWindowNearCursor(): void {
