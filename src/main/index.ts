@@ -213,8 +213,13 @@ ipcMain.handle('copy-and-paste', async (_, content: string) => {
       return true;
     }
 
-    mainWindow?.hide();
-    await new Promise<void>((r) => setTimeout(r, 500));
+    // Wait for the window to actually be hidden before simulating paste,
+    // so the previously focused app has time to regain focus.
+    await new Promise<void>((r) => {
+      if (!mainWindow || !mainWindow.isVisible()) { r(); return; }
+      mainWindow.once('hide', () => setTimeout(r, 80));
+      mainWindow.hide();
+    });
     await simulatePaste(lastFocusedIsTerminal);
   } catch (err) {
     console.error('[copy-and-paste] CRASH:', err);

@@ -90,11 +90,25 @@ export default function App() {
       load('')
     })
 
+    // Re-check paste tool on every focus so newly installed wtype/xdotool
+    // is picked up immediately and the warning banner updates without restart.
+    const recheckPasteTool = async () => {
+      const { silent, mutterAllowed } = await window.electronAPI.checkPasteTool()
+      setSilentPaste(silent)
+      setMutterConsentState(mutterAllowed)
+      if (silent || mutterAllowed) setWarning(false)
+      else setWarning(true)
+    }
+    window.addEventListener('focus', recheckPasteTool)
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') window.electronAPI.hideWindow()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('focus', recheckPasteTool)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [load])
 
   const cycleTheme = () => {
@@ -146,6 +160,11 @@ export default function App() {
             <path d="M8 9h12M8 13h12M8 17h8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
           </svg>
           Clipboard Manager
+          {import.meta.env.DEV && (
+            <span style={{ fontSize: 9, background: '#f59e0b', color: '#000', borderRadius: 3, padding: '1px 4px', marginLeft: 4, fontWeight: 700, letterSpacing: 1 }}>
+              DEV
+            </span>
+          )}
         </div>
         <div className="header-actions">
           <button className="btn-theme" onClick={cycleTheme} title={`Theme: ${themePref}`}>

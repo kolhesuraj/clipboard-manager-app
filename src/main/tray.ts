@@ -21,7 +21,8 @@ export function createTray(win: BrowserWindow, isDark: boolean): Tray {
   const icon = iconForTheme(isDark)
 
   tray = new Tray(icon)
-  tray.setToolTip('Clipboard Manager  (Super+Shift+V)')
+  const isDev = !app.isPackaged
+  tray.setToolTip(isDev ? '[DEV] Clipboard Manager' : 'Clipboard Manager  (Super+Shift+V)')
 
   const menu = Menu.buildFromTemplate([
     { label: 'Show / Hide', click: () => toggleWindow(win) },
