@@ -30,7 +30,7 @@ declare global {
       onPasteToolMissing: (cb: () => void) => void
       onPasteBlocked: (cb: () => void) => void
       onWindowShown: (cb: () => void) => void
-      checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean }>
+      checkPasteTool: () => Promise<{ silent: boolean; mutterAllowed: boolean; ydotoolInstalled: boolean; ydotoolDaemonUp: boolean }>
       setMutterConsent: (value: boolean) => Promise<void>
       moveWindowBy: (dx: number, dy: number) => void
     }
@@ -71,6 +71,8 @@ export default function App() {
   const [warning, setWarning] = useState(false)
   const [mutterConsent, setMutterConsentState] = useState(false)
   const [silentPaste, setSilentPaste] = useState(true)
+  const [ydotoolInstalled, setYdotoolInstalled] = useState(true)
+  const [ydotoolDaemonUp, setYdotoolDaemonUp] = useState(true)
 
   const lastMouse = useRef<{ x: number; y: number } | null>(null)
 
@@ -124,9 +126,12 @@ export default function App() {
     loadRef.current('')
 
     const syncPasteTool = async () => {
-      const { silent, mutterAllowed } = await window.electronAPI.checkPasteTool()
+      const { silent, mutterAllowed, ydotoolInstalled: yInst, ydotoolDaemonUp: yUp } =
+        await window.electronAPI.checkPasteTool()
       setSilentPaste(silent)
       setMutterConsentState(mutterAllowed)
+      setYdotoolInstalled(yInst)
+      setYdotoolDaemonUp(yUp)
       setWarning(!silent && !mutterAllowed)
     }
     syncPasteTool()
@@ -242,7 +247,13 @@ export default function App() {
           {warning && (
             <div className="warning-banner">
               <div className="warning-banner-row warning-banner-row--spread">
-                <span>⚠️ Auto-paste unavailable — <b>wtype</b> not installed · xdotool triggers screen recording on GNOME 46+</span>
+                <span>
+                  {!ydotoolInstalled
+                    ? <>⚠️ Auto-paste unavailable — <b>ydotool</b> not installed</>
+                    : !ydotoolDaemonUp
+                    ? <>⚠️ Auto-paste unavailable — <b>ydotoold</b> daemon not running</>
+                    : <>⚠️ Auto-paste unavailable — no working paste tool found</>}
+                </span>
                 <button className="warning-dismiss" onClick={() => setWarning(false)}>✕</button>
               </div>
               <div className="warning-banner-row">
@@ -253,9 +264,19 @@ export default function App() {
                 >
                   Allow via screen recording
                 </button>
-                <span className="warning-or">or install wtype:</span>
-                <code className="warning-cmd-inline">sudo apt install wtype</code>
-                <CopyCmd text="sudo apt install wtype" />
+                {!ydotoolInstalled ? (
+                  <>
+                    <span className="warning-or">or install:</span>
+                    <code className="warning-cmd-inline">sudo apt install ydotool</code>
+                    <CopyCmd text="sudo apt install ydotool" />
+                  </>
+                ) : !ydotoolDaemonUp ? (
+                  <>
+                    <span className="warning-or">or start daemon:</span>
+                    <code className="warning-cmd-inline">systemctl --user start ydotoold</code>
+                    <CopyCmd text="systemctl --user start ydotoold" />
+                  </>
+                ) : null}
               </div>
             </div>
           )}

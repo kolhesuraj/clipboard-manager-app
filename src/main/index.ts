@@ -7,7 +7,7 @@ import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './
 import { createTray, updateTrayTheme } from './tray.ts';
 import { simulatePaste, writeToSystemClipboard } from './paste.ts';
 import { getFocusState } from './utils/focus.ts';
-import { hasSilentPasteTool } from './utils/shell.ts';
+import { hasSilentPasteTool, which, ydotoolWorks } from './utils/shell.ts';
 import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-server.ts';
 
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
@@ -228,6 +228,8 @@ ipcMain.handle('hide-window', () => {
 ipcMain.handle('check-paste-tool', () => ({
   silent: hasSilentPasteTool(),
   mutterAllowed: settings.mutterConsent,
+  ydotoolInstalled: !!which('ydotool'),
+  ydotoolDaemonUp: ydotoolWorks(),
 }));
 ipcMain.handle('set-mutter-consent', (_, value: boolean) => {
   settings.mutterConsent = value;
