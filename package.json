@@ -134,7 +134,6 @@
       "desktop": {
         "Name": "Clipboard Manager",
         "Comment": "Fast clipboard history manager for Linux",
-        "Exec": "clipboard-manager --no-sandbox",
         "StartupNotify": "false",
         "Terminal": "false"
       }
