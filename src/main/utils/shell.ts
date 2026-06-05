@@ -21,9 +21,9 @@ export function which(bin: string): string | null {
   return found
 }
 
-export function runAsync(cmd: string, args: string[]): Promise<boolean> {
+export function runAsync(cmd: string, args: string[], extraEnv?: Record<string, string>): Promise<boolean> {
   return new Promise((resolve) => {
-    const proc = spawn(cmd, args, { env: process.env })
+    const proc = spawn(cmd, args, { env: { ...process.env, ...extraEnv } })
     let stderr = ''
     proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
     proc.on('close', (code: number | null) => {

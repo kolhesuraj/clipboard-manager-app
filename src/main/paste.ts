@@ -1,4 +1,39 @@
+import { spawn } from 'child_process'
+import { existsSync } from 'fs'
 import { which, runAsync, isXtestSilent } from './utils/shell.ts'
+
+// Check once — wl-copy installation won't change at runtime.
+const HAS_WL_COPY = existsSync('/usr/bin/wl-copy')
+
+// Resolve Wayland env once — used by both writeToSystemClipboard and simulateViaWtype.
+function waylandEnv(): Record<string, string> {
+  return {
+    WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || 'wayland-0',
+    XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ||
+      `/run/user/${(process as NodeJS.Process & { getuid?: () => number }).getuid?.() ?? 1000}`,
+  }
+}
+
+/** Write content to the Wayland clipboard so native Wayland apps can paste.
+ *  wl-copy 2.2.1+ sends a libnotify "wl-clipboard is ready" notification via
+ *  D-Bus. Pointing DBUS_SESSION_BUS_ADDRESS at a non-existent socket makes
+ *  libnotify fail silently while the Wayland clipboard write (via
+ *  WAYLAND_DISPLAY) still succeeds. */
+export function writeToSystemClipboard(text: string): void {
+  if (!HAS_WL_COPY) return
+  const proc = spawn('wl-copy', [], {
+    env: {
+      ...process.env,
+      ...waylandEnv(),
+      DBUS_SESSION_BUS_ADDRESS: 'unix:path=/tmp/.cm-dbus-disabled',
+    },
+    detached: true,
+    stdio: ['pipe', 'ignore', 'ignore'],
+  })
+  proc.stdin.write(text)
+  proc.stdin.end()
+  proc.unref()
+}
 
 function buildMutterScript(isTerminal: boolean): string {
   const keyBlock = isTerminal
@@ -58,7 +93,9 @@ async function simulateViaXdotool(isTerminal: boolean): Promise<boolean> {
   // triggers the screen-recording indicator — skip it to avoid the prompt.
   if (!isXtestSilent()) return false
   const keys = isTerminal ? 'ctrl+shift+v' : 'ctrl+v'
-  return runAsync('xdotool', ['key', '--clearmodifiers', keys])
+  return runAsync('xdotool', ['key', '--clearmodifiers', keys], {
+    DISPLAY: process.env.DISPLAY || ':0',
+  })
 }
 
 async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
@@ -66,7 +103,9 @@ async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
   const args = isTerminal
     ? ['-M', 'ctrl', '-M', 'shift', '-k', 'v', '-m', 'shift', '-m', 'ctrl']
     : ['-M', 'ctrl', '-k', 'v', '-m', 'ctrl']
-  return runAsync('wtype', args)
+  // Explicitly pass Wayland env — the production Electron binary may be
+  // launched without WAYLAND_DISPLAY in process.env (e.g. from GNOME Apps).
+  return runAsync('wtype', args, waylandEnv())
 }
 
 export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<boolean> {

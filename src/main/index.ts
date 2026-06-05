@@ -5,7 +5,7 @@ import path from 'path';
 import { initDatabase, getItems, deleteItem, clearHistory, togglePin } from './database.ts';
 import { startClipboardWatcher, stopClipboardWatcher, copyToClipboard } from './clipboard.ts';
 import { createTray, updateTrayTheme } from './tray.ts';
-import { simulatePaste } from './paste.ts';
+import { simulatePaste, writeToSystemClipboard } from './paste.ts';
 import { getFocusState } from './utils/focus.ts';
 import { hasSilentPasteTool } from './utils/shell.ts';
 import { startTriggerServer, stopTriggerServer, getSocketPath } from './trigger-server.ts';
@@ -237,6 +237,7 @@ ipcMain.handle('set-mutter-consent', (_, value: boolean) => {
 ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
     copyToClipboard(content);
+    writeToSystemClipboard(content);
 
     if (!hasSilentPasteTool() && !settings.mutterConsent) {
       mainWindow?.webContents.send('paste-blocked');
