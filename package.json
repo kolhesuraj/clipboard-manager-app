@@ -72,6 +72,7 @@
       "out/**/*",
       "!node_modules/better-sqlite3/deps/**",
       "!node_modules/better-sqlite3/src/**",
+      "!node_modules/better-sqlite3/build/Release/obj.target/**",
       "!node_modules/prebuild-install/**",
       "!node_modules/node-abi/**",
       "!node_modules/napi-build-utils/**",
@@ -133,6 +134,7 @@
       "desktop": {
         "Name": "Clipboard Manager",
         "Comment": "Fast clipboard history manager for Linux",
+        "Exec": "clipboard-manager --no-sandbox",
         "StartupNotify": "false",
         "Terminal": "false"
       }

@@ -1,16 +1,17 @@
 const { rm, access } = require('fs/promises')
 const path = require('path')
 
-// These files are not needed because:
-// - GPU libs: app runs with --disable-gpu and disableHardwareAcceleration()
-// - libffmpeg: app has no audio/video playback
+// GPU-related libs are safe to remove because the app runs with
+// --disable-gpu and disableHardwareAcceleration(). libffmpeg.so must stay —
+// even though the app has no media playback, Electron 31 lists it as a
+// hard NEEDED dependency in its ELF binary so the dynamic linker requires
+// it at process startup.
 const UNNEEDED = [
   'libvulkan.so.1',
   'libvk_swiftshader.so',
   'vk_swiftshader_icd.json',
   'libGLESv2.so',
   'libEGL.so',
-  'libffmpeg.so',
   'chrome_crashpad_handler',
 ]
 
