@@ -27,17 +27,13 @@ fi
 #   2. Current user in the input group
 #   3. ydotoold daemon running as a systemd user service
 if command -v ydotool >/dev/null 2>&1; then
-    # udev rule so input group can access /dev/uinput
+    # udev rule: world-writable so ydotoold can access /dev/uinput without
+    # requiring the user to be in the input group (avoids logout/re-login).
     cat > /etc/udev/rules.d/60-ydotool.rules << 'UDEV_EOF'
-KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+KERNEL=="uinput", MODE="0666", OPTIONS+="static_node=uinput"
 UDEV_EOF
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger --name-match=uinput 2>/dev/null || true
-
-    # Add desktop user to input group
-    if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
-        usermod -aG input "$CURRENT_USER" 2>/dev/null || true
-    fi
 
     # Install ydotoold systemd user service if the package didn't include one
     if ! systemctl --user --quiet is-enabled ydotoold 2>/dev/null && \
