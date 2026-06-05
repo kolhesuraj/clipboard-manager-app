@@ -7,17 +7,13 @@ DESKTOP_SRC="/usr/share/applications/clipboard-manager.desktop"
 AUTOSTART_DIR="/etc/xdg/autostart"
 ICON_SRC="/opt/clipboard-manager/resources/icon-512.png"
 
-# ── Install paste tools ───────────────────────────────────────────────────
-MISSING=""
-command -v wtype   >/dev/null 2>&1 || MISSING="$MISSING wtype"
-command -v xdotool >/dev/null 2>&1 || MISSING="$MISSING xdotool"
-command -v ydotool >/dev/null 2>&1 || MISSING="$MISSING ydotool"
-
-if [ -n "$MISSING" ]; then
-    echo "Installing paste tools:$MISSING ..."
+# ── Safety net: ensure ydotool is present (it is in depends, but dpkg -i
+#    installs without resolving deps — fall back to apt if missing) ─────────
+if ! command -v ydotool >/dev/null 2>&1; then
+    echo "Installing ydotool ..."
     apt-get update -qq || true
-    apt-get install -y --no-install-recommends $MISSING || \
-        echo "Warning: could not auto-install$MISSING — paste simulation may not work."
+    apt-get install -y --no-install-recommends ydotool || \
+        echo "Warning: could not install ydotool — paste simulation may not work."
 fi
 
 # ── ydotool: udev rule + input group + user service ───────────────────────
