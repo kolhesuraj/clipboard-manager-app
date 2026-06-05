@@ -1,6 +1,6 @@
 import { spawn } from 'child_process'
 import { existsSync } from 'fs'
-import { which, runAsync, isXtestSilent } from './utils/shell.ts'
+import { which, runAsync, isXtestSilent, ydotoolWorks } from './utils/shell.ts'
 
 // Check once — wl-copy installation won't change at runtime.
 const HAS_WL_COPY = existsSync('/usr/bin/wl-copy')
@@ -98,6 +98,14 @@ async function simulateViaXdotool(isTerminal: boolean): Promise<boolean> {
   })
 }
 
+async function simulateViaYdotool(isTerminal: boolean): Promise<boolean> {
+  if (!ydotoolWorks()) return false
+  const uid = (process as NodeJS.Process & { getuid?: () => number }).getuid?.() ?? 1000
+  const socket = process.env.YDOTOOL_SOCKET || `/run/user/${uid}/ydotool`
+  const keys = isTerminal ? 'ctrl+shift+v' : 'ctrl+v'
+  return runAsync('ydotool', ['key', keys], { YDOTOOL_SOCKET: socket })
+}
+
 async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
   if (!which('wtype')) return false
   const args = isTerminal
@@ -111,6 +119,7 @@ async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
 export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<boolean> {
   console.log(`[paste] sending ${isTerminal ? 'Ctrl+Shift+V (terminal)' : 'Ctrl+V'}`)
 
+  if (await simulateViaYdotool(isTerminal)) { console.log('[paste] ydotool ok'); return true }
   if (await simulateViaWtype(isTerminal))   { console.log('[paste] wtype ok');   return true }
   if (await simulateViaXdotool(isTerminal)) { console.log('[paste] xdotool ok'); return true }
 

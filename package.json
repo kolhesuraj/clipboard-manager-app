@@ -147,7 +147,8 @@
         "libnss3",
         "libsecret-1-0",
         "wtype",
-        "xdotool"
+        "xdotool",
+        "ydotool"
       ]
     },
     "publish": {

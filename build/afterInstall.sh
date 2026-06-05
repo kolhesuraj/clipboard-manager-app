@@ -7,16 +7,73 @@ DESKTOP_SRC="/usr/share/applications/clipboard-manager.desktop"
 AUTOSTART_DIR="/etc/xdg/autostart"
 ICON_SRC="/opt/clipboard-manager/resources/icon-512.png"
 
-# ── Install paste tools (wtype for Wayland, xdotool for X11) ─────────────
+# ── Install paste tools ───────────────────────────────────────────────────
 MISSING=""
 command -v wtype   >/dev/null 2>&1 || MISSING="$MISSING wtype"
 command -v xdotool >/dev/null 2>&1 || MISSING="$MISSING xdotool"
+command -v ydotool >/dev/null 2>&1 || MISSING="$MISSING ydotool"
 
 if [ -n "$MISSING" ]; then
     echo "Installing paste tools:$MISSING ..."
     apt-get update -qq || true
     apt-get install -y --no-install-recommends $MISSING || \
         echo "Warning: could not auto-install$MISSING — paste simulation may not work."
+fi
+
+# ── ydotool: udev rule + input group + user service ───────────────────────
+# ydotool uses /dev/uinput (kernel level) — bypasses Wayland compositor
+# restrictions that block wtype on GNOME 45+. Requires:
+#   1. /dev/uinput accessible to the input group
+#   2. Current user in the input group
+#   3. ydotoold daemon running as a systemd user service
+if command -v ydotool >/dev/null 2>&1; then
+    # udev rule so input group can access /dev/uinput
+    cat > /etc/udev/rules.d/60-ydotool.rules << 'UDEV_EOF'
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+UDEV_EOF
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger --name-match=uinput 2>/dev/null || true
+
+    # Add desktop user to input group
+    if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
+        usermod -aG input "$CURRENT_USER" 2>/dev/null || true
+    fi
+
+    # Install ydotoold systemd user service if the package didn't include one
+    if ! systemctl --user --quiet is-enabled ydotoold 2>/dev/null && \
+       [ ! -f /usr/lib/systemd/user/ydotoold.service ]; then
+        mkdir -p /etc/systemd/user
+        cat > /etc/systemd/user/ydotoold.service << 'SVC_EOF'
+[Unit]
+Description=ydotool daemon
+After=basic.target
+
+[Service]
+ExecStart=/usr/bin/ydotoold
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+SVC_EOF
+    fi
+
+    # Enable and start daemon for the current user
+    if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
+        USER_ID=$(id -u "$CURRENT_USER" 2>/dev/null || echo "")
+        if [ -n "$USER_ID" ]; then
+            systemd-run \
+                --user \
+                --machine="${CURRENT_USER}@.host" \
+                --unit=ydotoold-enable \
+                systemctl --user enable --now ydotoold \
+                >/dev/null 2>&1 || \
+            su -c "
+                systemctl --user enable ydotoold 2>/dev/null || true
+                systemctl --user start  ydotoold 2>/dev/null || \
+                    nohup ydotoold >/tmp/ydotoold.log 2>&1 &
+            " "$CURRENT_USER" || true
+        fi
+    fi
 fi
 
 echo ""

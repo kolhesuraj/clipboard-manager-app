@@ -83,11 +83,26 @@ function wtypeWorks(): boolean {
   return _wtypeWorks
 }
 
+// Cached after first check — daemon presence doesn't change at runtime.
+let _ydotoolWorks: boolean | null = null
+
+/** Checks whether ydotool's daemon socket is present.
+ *  ydotool uses /dev/uinput (kernel level) — bypasses all Wayland compositor
+ *  restrictions and produces no screen-recording indicator. */
+export function ydotoolWorks(): boolean {
+  if (_ydotoolWorks !== null) return _ydotoolWorks
+  if (!which('ydotool')) { _ydotoolWorks = false; return false }
+  const uid = (process as NodeJS.Process & { getuid?: () => number }).getuid?.() ?? 1000
+  const socket = process.env.YDOTOOL_SOCKET || `/run/user/${uid}/ydotool`
+  _ydotoolWorks = existsSync(socket)
+  if (!_ydotoolWorks) console.log('[paste] ydotool daemon socket not found:', socket)
+  return _ydotoolWorks
+}
+
 /** Returns true if a non-intrusive paste tool is available.
- *  On GNOME 46+, xdotool is excluded because its XTEST calls route through
- *  Mutter RemoteDesktop internally and trigger the screen-recording indicator.
- *  wtype is probed at runtime — on GNOME 45+ the compositor restricts
- *  zwp_virtual_keyboard_v1 even when the binary is installed. */
+ *  Priority: ydotool (kernel uinput) > wtype (Wayland vkbd) > xdotool (X11).
+ *  On GNOME 45+, wtype is probed — compositor restricts zwp_virtual_keyboard_v1.
+ *  On GNOME 46+, xdotool routes through Mutter and triggers screen-recording. */
 export function hasSilentPasteTool(): boolean {
-  return !!(wtypeWorks() || (isXtestSilent() && which('xdotool')))
+  return !!(ydotoolWorks() || wtypeWorks() || (isXtestSilent() && which('xdotool')))
 }
