@@ -21,16 +21,20 @@ export function which(bin: string): string | null {
   return found
 }
 
-export function runAsync(cmd: string, args: string[], extraEnv?: Record<string, string>): Promise<boolean> {
+export function runAsync(cmd: string, args: string[], extraEnv?: Record<string, string>, timeoutMs?: number): Promise<boolean> {
   return new Promise((resolve) => {
     const proc = spawn(cmd, args, { env: { ...process.env, ...extraEnv } })
     let stderr = ''
+    let done = false
+    const finish = (ok: boolean) => { if (!done) { done = true; resolve(ok) } }
+    const timer = timeoutMs ? setTimeout(() => { proc.kill(); finish(false) }, timeoutMs) : null
     proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
     proc.on('close', (code: number | null) => {
+      if (timer) clearTimeout(timer)
       if (stderr) console.warn('[paste] stderr:', stderr.trim())
-      resolve(code === 0)
+      finish(code === 0)
     })
-    proc.on('error', () => resolve(false))
+    proc.on('error', () => { if (timer) clearTimeout(timer); finish(false) })
   })
 }
 
@@ -83,26 +87,49 @@ function wtypeWorks(): boolean {
   return _wtypeWorks
 }
 
-// Cached after first check — daemon presence doesn't change at runtime.
+// Only cache a positive result — the socket may appear after app startup
+// (e.g. ydotoold started by the post-install script a moment after the app).
+// Caching false would permanently break paste until the user restarts the app.
 let _ydotoolWorks: boolean | null = null
 
 /** Checks whether ydotool's daemon socket is present.
  *  ydotool uses /dev/uinput (kernel level) — bypasses all Wayland compositor
  *  restrictions and produces no screen-recording indicator. */
 export function ydotoolWorks(): boolean {
-  if (_ydotoolWorks !== null) return _ydotoolWorks
-  if (!which('ydotool')) { _ydotoolWorks = false; return false }
+  if (_ydotoolWorks) return true
+  if (!which('ydotool')) return false
   const uid = (process as NodeJS.Process & { getuid?: () => number }).getuid?.() ?? 1000
   const socket = process.env.YDOTOOL_SOCKET || `/run/user/${uid}/ydotool`
-  _ydotoolWorks = existsSync(socket)
-  if (!_ydotoolWorks) console.log('[paste] ydotool daemon socket not found:', socket)
-  return _ydotoolWorks
+  if (!existsSync(socket)) { console.log('[paste] ydotool daemon socket not found:', socket); return false }
+  _ydotoolWorks = true
+  return true
+}
+
+// Cached — GNOME version doesn't change at runtime.
+let _isGnome46Plus: boolean | null = null
+
+/** Returns true when running under GNOME 46 or newer.
+ *  On GNOME 46+ ydotool/uinput events are ignored by the compositor and
+ *  wtype's zwp_virtual_keyboard_v1 is restricted — only the Mutter
+ *  RemoteDesktop API reliably injects keystrokes. */
+export function isGnome46Plus(): boolean {
+  if (_isGnome46Plus !== null) return _isGnome46Plus
+  const shellPath = which('gnome-shell')
+  if (!shellPath) { _isGnome46Plus = false; return false }
+  try {
+    const out = execFileSync(shellPath, ['--version'], { encoding: 'utf8' }).trim()
+    const m = out.match(/GNOME Shell (\d+)/)
+    _isGnome46Plus = m ? parseInt(m[1], 10) >= 46 : false
+  } catch {
+    _isGnome46Plus = false
+  }
+  return _isGnome46Plus
 }
 
 /** Returns true if a non-intrusive paste tool is available.
- *  Priority: ydotool (kernel uinput) > wtype (Wayland vkbd) > xdotool (X11).
- *  On GNOME 45+, wtype is probed — compositor restricts zwp_virtual_keyboard_v1.
- *  On GNOME 46+, xdotool routes through Mutter and triggers screen-recording. */
+ *  On GNOME 46+ the Mutter RemoteDesktop API is always available and does
+ *  not show a screen-recording dialog for keyboard-only sessions. */
 export function hasSilentPasteTool(): boolean {
+  if (isGnome46Plus()) return true
   return !!(ydotoolWorks() || wtypeWorks() || (isXtestSilent() && which('xdotool')))
 }

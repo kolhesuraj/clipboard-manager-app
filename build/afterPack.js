@@ -1,5 +1,6 @@
-const { rm, access } = require('fs/promises')
-const path = require('path')
+import { rm, access } from 'fs/promises'
+import path from 'path'
+/* global console */
 
 // GPU-related libs are safe to remove because the app runs with
 // --disable-gpu and disableHardwareAcceleration(). libffmpeg.so must stay —
@@ -15,7 +16,7 @@ const UNNEEDED = [
   'chrome_crashpad_handler',
 ]
 
-exports.default = async function afterPack({ appOutDir }) {
+export default async function afterPack({ appOutDir }) {
   for (const file of UNNEEDED) {
     const filePath = path.join(appOutDir, file)
     try {

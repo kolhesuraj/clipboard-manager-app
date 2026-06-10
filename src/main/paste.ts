@@ -1,6 +1,6 @@
 import { spawn } from 'child_process'
 import { existsSync } from 'fs'
-import { which, runAsync, isXtestSilent, ydotoolWorks } from './utils/shell.ts'
+import { which, runAsync, isXtestSilent, ydotoolWorks, isGnome46Plus } from './utils/shell.ts'
 
 // Check once — wl-copy installation won't change at runtime.
 const HAS_WL_COPY = existsSync('/usr/bin/wl-copy')
@@ -84,7 +84,8 @@ const MUTTER_SCRIPT_NORMAL   = buildMutterScript(false)
 const MUTTER_SCRIPT_TERMINAL = buildMutterScript(true)
 
 async function simulateViaMutter(isTerminal: boolean): Promise<boolean> {
-  return runAsync('python3', ['-c', isTerminal ? MUTTER_SCRIPT_TERMINAL : MUTTER_SCRIPT_NORMAL])
+  // 3 s timeout — prevents hanging if a D-Bus permission dialog appears.
+  return runAsync('python3', ['-c', isTerminal ? MUTTER_SCRIPT_TERMINAL : MUTTER_SCRIPT_NORMAL], undefined, 3000)
 }
 
 async function simulateViaXdotool(isTerminal: boolean): Promise<boolean> {
@@ -119,10 +120,20 @@ async function simulateViaWtype(isTerminal: boolean): Promise<boolean> {
 export async function simulatePaste(isTerminal: boolean, mutterConsent: boolean): Promise<boolean> {
   console.log(`[paste] sending ${isTerminal ? 'Ctrl+Shift+V (terminal)' : 'Ctrl+V'}`)
 
+  // On GNOME 46+ ydotool/uinput events are silently dropped by the compositor,
+  // wtype's virtual keyboard protocol is restricted, and xdotool triggers the
+  // screen-recording indicator. The Mutter RemoteDesktop API is the only
+  // reliable path — it injects at compositor level and requires no dialog for
+  // keyboard-only sessions.
+  if (isGnome46Plus()) {
+    if (await simulateViaMutter(isTerminal)) { console.log('[paste] mutter ok'); return true }
+    console.warn('[paste] mutter failed on GNOME 46+')
+    return false
+  }
+
   if (await simulateViaYdotool(isTerminal)) { console.log('[paste] ydotool ok'); return true }
   if (await simulateViaWtype(isTerminal))   { console.log('[paste] wtype ok');   return true }
   if (await simulateViaXdotool(isTerminal)) { console.log('[paste] xdotool ok'); return true }
-
   if (mutterConsent && await simulateViaMutter(isTerminal)) { console.log('[paste] mutter ok'); return true }
 
   console.warn('[paste] Could not simulate paste — content is in clipboard, paste manually.')

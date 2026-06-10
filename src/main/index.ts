@@ -238,23 +238,38 @@ ipcMain.handle('set-mutter-consent', (_, value: boolean) => {
 
 ipcMain.handle('copy-and-paste', async (_, content: string) => {
   try {
+    console.log(`[paste] copy-and-paste start | isTerminal=${lastFocusedIsTerminal} mutterConsent=${settings.mutterConsent}`);
     copyToClipboard(content);
     writeToSystemClipboard(content);
 
     if (!hasSilentPasteTool() && !settings.mutterConsent) {
+      console.log('[paste] blocked — no silent paste tool and mutter consent not given');
       mainWindow?.webContents.send('paste-blocked');
       return 'blocked';
     }
 
-    // Wait for the window to actually be hidden before simulating paste,
-    // so the previously focused app has time to regain focus.
+    // Hide the window, then wait until focus has actually left it before
+    // sending the keystroke. We resolve on whichever comes first:
+    //   • blur event + 100ms  — compositor confirmed focus moved away
+    //   • hide event + 350ms  — fallback if blur doesn't fire (some WMs)
+    const t0 = Date.now();
     await new Promise<void>((r) => {
-      if (!mainWindow || !mainWindow.isVisible()) { r(); return; }
-      mainWindow.once('hide', () => setTimeout(r, 80));
+      if (!mainWindow || !mainWindow.isVisible()) { console.log('[paste] window already hidden'); r(); return; }
+      let done = false;
+      const resolve = (reason: string) => {
+        if (done) return;
+        done = true;
+        console.log(`[paste] focus-wait resolved via ${reason} after ${Date.now() - t0}ms`);
+        r();
+      };
+      mainWindow.once('blur', () => setTimeout(() => resolve('blur+100ms'), 100));
+      mainWindow.once('hide', () => setTimeout(() => resolve('hide+350ms'), 350));
       mainWindow.hide();
     });
 
+    console.log(`[paste] sending keystroke now | elapsed=${Date.now() - t0}ms`);
     const pasted = await simulatePaste(lastFocusedIsTerminal, settings.mutterConsent);
+    console.log(`[paste] simulatePaste returned ${pasted}`);
     if (!pasted) {
       mainWindow?.webContents.send('paste-tool-missing');
     }
